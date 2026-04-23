@@ -1,0 +1,211 @@
+import { useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { usePlayerStore } from './store/usePlayerStore';
+import { audioEngine } from './services/audioEngine';
+import { Header } from './components/Header';
+import { Sidebar } from './components/Sidebar';
+import { WaveformDisplay } from './components/WaveformDisplay';
+import { Mixer } from './components/Mixer';
+import { TransportControls } from './components/TransportControls';
+import { LoginScreen } from './components/LoginScreen';
+import { useMIDI } from './hooks/useMIDI';
+
+import { Teleprompter } from './components/Teleprompter';
+import { PadsPlayer } from './components/PadsPlayer';
+
+export default function App() {
+  const { 
+    isPlaying, currentTime, seek, currentSong, togglePlay, stop, toggleLoop, 
+    setPlaybackRate, playbackRate, initPersistence,
+    isAuthenticated, isStageMode, isSidebarOpen
+  } = usePlayerStore();
+
+  useMIDI(); // Initialize MIDI foot pedals
+  
+  useEffect(() => {
+    initPersistence();
+  }, [initPersistence]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      switch (e.code) {
+        case 'Space': e.preventDefault(); togglePlay(); break;
+        case 'KeyS': stop(); break;
+        case 'KeyL': toggleLoop(); break;
+        case 'Digit1': case 'Digit2': case 'Digit3': case 'Digit4': case 'Digit5':
+        case 'Digit6': case 'Digit7': case 'Digit8': case 'Digit9':
+          if (currentSong) {
+            const markerIndex = parseInt(e.key) - 1;
+            if (currentSong.markers[markerIndex]) seek(currentSong.markers[markerIndex].startTime);
+          }
+          break;
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [togglePlay, stop, toggleLoop, seek, currentSong]);
+
+  useEffect(() => {
+
+    let animationFrameId: number;
+    let lastTime = 0;
+
+    const tick = (timestamp: number) => {
+      // Limit updates to UI to avoid React thrashing, 
+      // but ensure smooth animation for playhead if needed via CSS or refs ideally.
+      // Doing it in store works but might re-render too much. Let's throttle slightly if needed, 
+      // but requestAnimationFrame is better than setInterval.
+      if (timestamp - lastTime >= 50) { // ~20fps upate is enough for numbers, waveform is CSS
+        const engTime = audioEngine.getCurrentTime();
+        if (currentSong && engTime >= currentSong.duration) {
+          seek(0);
+          stop(); // Or loop based on settings
+        } else {
+          // We bypass Zustand store to avoid massive re-renders of the WHOLE app
+          // But since other components rely on currentTime from store, we'll update it.
+          usePlayerStore.setState({ currentTime: engTime });
+        }
+        lastTime = timestamp;
+      }
+      
+      if (isPlaying) {
+        animationFrameId = requestAnimationFrame(tick);
+      }
+    };
+
+    if (isPlaying && currentSong) {
+      animationFrameId = requestAnimationFrame(tick);
+    }
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [isPlaying, currentSong, seek, stop]);
+
+  if (!isAuthenticated) return <LoginScreen />;
+
+  return (
+    <div className="flex flex-col h-screen bg-[#050506] text-white overflow-hidden font-sans select-none relative">
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-[#00A3FF]/10 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-[#00A3FF]/5 blur-[120px] rounded-full pointer-events-none" />
+
+      <Header />
+      
+      <div className="flex flex-1 overflow-hidden relative z-10 w-full">
+        {/* Sidebar for Desktop - Always visible unless Stage Mode */}
+        {!isStageMode && (
+          <div className="hidden lg:block h-full z-40 relative">
+            <Sidebar />
+          </div>
+        )}
+
+        {/* Sidebar Overlay for Mobile */}
+        <AnimatePresence>
+          {(!isStageMode && isSidebarOpen) && (
+            <motion.div
+              initial={{ x: -320 }}
+              animate={{ x: 0 }}
+              exit={{ x: -320 }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="absolute lg:hidden z-50 h-full shadow-2xl"
+            >
+              <Sidebar />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Close overlay on mobile */}
+        {(!isStageMode && isSidebarOpen) && (
+           <div 
+             className="absolute inset-0 z-40 bg-black/50 lg:hidden backdrop-blur-sm"
+             onClick={() => usePlayerStore.getState().setShowSidebar(false)}
+           />
+        )}
+        
+        <main className="flex-1 flex flex-col overflow-hidden bg-black/20 backdrop-blur-sm relative z-10">
+          <WaveformDisplay />
+          
+          <div className="flex-1 overflow-hidden flex flex-col">
+             {isStageMode ? (
+               <div className="h-full flex flex-col items-center justify-center p-8 text-center bg-gradient-to-b from-transparent to-[#00A3FF]/5">
+                 <div className="text-[120px] md:text-[200px] font-black tabular-nums tracking-tighter leading-none text-[#00A3FF] drop-shadow-[0_0_80px_rgba(0,163,255,0.4)]">
+                   {Math.floor(currentTime / 60)}:{(Math.floor(currentTime) % 60).toString().padStart(2, '0')}
+                 </div>
+                 {currentSong && currentSong.markers.length > 0 && (
+                    <div className="mt-8 px-12 py-6 bg-white/5 backdrop-blur-xl border border-white/10 rounded-full flex flex-col gap-2">
+                       <span className="text-white/40 uppercase tracking-[0.3em] font-black text-sm">Próxima Seção</span>
+                       <span className="text-4xl md:text-5xl font-black text-white">
+                         {currentSong.markers.find(m => m.startTime > currentTime)?.label || 'FIM DA MÚSICA'}
+                       </span>
+                    </div>
+                 )}
+               </div>
+             ) : (
+               <>
+                 <div className="flex-none h-[280px] overflow-hidden">
+                   <Mixer />
+                 </div>
+                 <div className="flex-1 flex flex-col md:flex-row gap-4 p-4 border-t border-white/5 bg-[#050506]/50 min-h-[300px] md:min-h-[250px] overflow-y-auto">
+                    <div className="flex-[2] rounded-2xl bg-white/[0.02] border border-white/5 overflow-hidden shadow-inner group transition-all min-h-[300px] md:min-h-0">
+                       <Teleprompter />
+                    </div>
+                    <div className="flex-[1] rounded-2xl bg-white/[0.02] border border-white/5 overflow-hidden shadow-inner p-4 min-h-[250px] md:min-h-0">
+                       <PadsPlayer />
+                    </div>
+                 </div>
+               </>
+             )}
+          </div>
+
+          <TransportControls />
+        </main>
+      </div>
+
+      {/* Global CSS for scrollbars and custom elements */}
+      <style>{`
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.02);
+          border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(255, 255, 255, 0.2);
+        }
+        input[type="range"]::-webkit-slider-thumb {
+          appearance: none;
+          width: 16px;
+          height: 16px;
+          background: #fff;
+          border-radius: 50%;
+          cursor: pointer;
+          border: 4px solid #00A3FF;
+          box-shadow: 0 0 15px rgba(0, 163, 255, 0.5);
+          transition: all 0.2s ease;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+          transform: scale(1.2);
+          box-shadow: 0 0 20px rgba(0, 163, 255, 0.8);
+        }
+        @keyframes pulse-glow {
+          0%, 100% { opacity: 0.5; }
+          50% { opacity: 1; }
+        }
+        .animate-pulse-glow {
+          animation: pulse-glow 2s infinite;
+        }
+      `}</style>
+    </div>
+  );
+}

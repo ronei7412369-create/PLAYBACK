@@ -1,0 +1,101 @@
+export interface Stem {
+  id: string;
+  name: string;
+  file?: string;
+  buffer?: any; // For Web Audio API
+  originalFile?: any;
+  output: number; // 1 = L, 2 = R, 3 = Stereo
+  volume: number; // 0.0 to 1.0
+  isMuted: boolean;
+  isSoloed: boolean;
+  pan: number;
+  eq?: {
+    low: number;  // -24 to 24 dB
+    mid: number;  // -24 to 24 dB
+    high: number; // -24 to 24 dB
+  };
+}
+
+export interface Marker {
+  id: string;
+  label: string;
+  startTime: number;
+  endTime?: number;
+  color: string;
+}
+
+export interface Song {
+  id: string;
+  title: string;
+  artist: string;
+  bpm: number;
+  key: string;
+  timeSignature: string;
+  duration: number;
+  stems: Stem[];
+  markers: Marker[];
+  waveformPeaks?: number[]; // Extracted audio data
+  lyrics?: string; // Teleprompter lyrics
+}
+
+export interface PlayerState {
+  // App State
+  isAuthenticated: boolean;
+  isStageMode: boolean;
+  isLoadingSong: boolean;
+  isSidebarOpen: boolean;
+
+  currentSong: Song | null;
+  isPlaying: boolean;
+  currentTime: number;
+  masterVolume: number;
+  isLooping: boolean;
+  isInfiniteLoop: boolean;
+  isFadeOut: boolean;
+  setlist: Song[];
+  
+  // Real-time parameters
+  playbackRate: number; // Tempo
+  metronomeEnabled: boolean;
+  isLRSplit: boolean; // Stereo vs L/R Mode
+  
+  // Pad parameters
+  activePadKey: string | null;
+  padVolume: number;
+
+  // Actions
+  login: () => void;
+  logout: () => void;
+  toggleStageMode: () => void;
+  setShowSidebar: (show: boolean) => void;
+
+  updateSongMetadata: (id: string, title: string, artist: string) => void;
+  updateSongLyrics: (id: string, lyrics: string) => void;
+  removeFromSetlist: (id: string) => void;
+
+  toggleAmbientPad: (key: string, frequency: number) => void;
+  setPadVolume: (volume: number) => void;
+
+  importSong: (song: Song, buffers?: {id:string, buffer:ArrayBuffer}[]) => void;
+  setCurrentSong: (song: Song) => Promise<void>;
+  updatePeaks?: (peaks: number[]) => void;
+  togglePlay: () => void;
+  stop: () => void;
+  seek: (time: number) => void;
+  setMasterVolume: (volume: number) => void;
+  setPlaybackRate: (rate: number) => void;
+  toggleMetronome: () => void;
+  toggleLRSplit: () => void;
+  
+  toggleLoop: () => void;
+  toggleInfiniteLoop: () => void;
+  triggerFadeOut: () => void;
+  updateStemVolume: (stemId: string, volume: number) => void;
+  toggleStemMute: (stemId: string) => void;
+  toggleStemSolo: (stemId: string) => void;
+  setStemOutput: (stemId: string, output: number) => void;
+  setStemEQ: (stemId: string, band: 'low' | 'mid' | 'high', value: number) => void;
+
+  initPersistence: () => Promise<void>;
+}
+
