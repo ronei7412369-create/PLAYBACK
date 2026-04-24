@@ -65,6 +65,17 @@ export default function App() {
           // We bypass Zustand store to avoid massive re-renders of the WHOLE app
           // But since other components rely on currentTime from store, we'll update it.
           usePlayerStore.setState({ currentTime: engTime });
+          
+          if (currentSong && currentSong.duration - engTime <= 15) {
+             const { setlist, preloadingSongId, preloadedSongIds } = usePlayerStore.getState();
+             const currentIndex = setlist.findIndex(s => s.id === currentSong.id);
+             if (currentIndex !== -1 && currentIndex < setlist.length - 1) {
+                const nextSongId = setlist[currentIndex + 1].id;
+                if (!preloadingSongId && !preloadedSongIds.includes(nextSongId)) {
+                   usePlayerStore.getState().preloadSong(nextSongId);
+                }
+             }
+          }
         }
         lastTime = timestamp;
       }
@@ -140,14 +151,14 @@ export default function App() {
                </div>
              ) : (
                <>
-                 <div className="flex-none h-[280px] overflow-hidden">
+                 <div className="flex-1 min-h-[300px] overflow-hidden">
                    <Mixer />
                  </div>
-                 <div className="flex-1 flex flex-col md:flex-row gap-4 p-4 border-t border-white/5 bg-[#050506]/50 min-h-[300px] md:min-h-[250px] overflow-y-auto">
-                    <div className="flex-[2] rounded-2xl bg-white/[0.02] border border-white/5 overflow-hidden shadow-inner group transition-all min-h-[300px] md:min-h-0">
+                 <div className="flex-none h-[180px] flex flex-col md:flex-row gap-4 px-4 pb-4 bg-[#050506]/50 md:overflow-hidden overflow-y-auto">
+                    <div className="flex-[2] rounded-xl bg-[#0A0A0B] border border-white/5 overflow-hidden group transition-all h-full min-h-[160px] md:min-h-0 relative">
                        <Teleprompter />
                     </div>
-                    <div className="flex-[1] rounded-2xl bg-white/[0.02] border border-white/5 overflow-hidden shadow-inner p-4 min-h-[250px] md:min-h-0">
+                    <div className="flex-none w-full md:w-[360px] rounded-xl bg-[#0A0A0B] border border-white/5 overflow-hidden p-3 h-full min-h-[160px] md:min-h-0">
                        <PadsPlayer />
                     </div>
                  </div>

@@ -84,9 +84,9 @@ export const TransportControls: React.FC = () => {
         >
           <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity rounded-[1.5rem] md:rounded-[2rem]" />
           {isPlaying ? (
-            <Pause size={28} className="md:w-[32px] md:h-[32px]" fill="currentColor" />
+            <Pause size={24} className="md:w-[28px] md:h-[28px]" fill="currentColor" />
           ) : (
-            <Play size={28} className="md:w-[32px] md:h-[32px] ml-1 md:ml-1.5" fill="currentColor" />
+            <Play size={24} className="md:w-[28px] md:h-[28px] ml-1 md:ml-1.5" fill="currentColor" />
           )}
         </motion.button>
 

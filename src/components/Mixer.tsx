@@ -15,7 +15,7 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({ stem }) => {
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex flex-col items-center w-24 h-full bg-[#0A0A0B] border-r border-white/5 py-6 group relative overflow-hidden"
+      className="flex flex-col items-center w-24 h-full bg-[#0A0A0B] border-r border-white/5 py-3 group relative overflow-hidden"
     >
       {/* Background Glow */}
       <div className={cn(
@@ -24,11 +24,11 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({ stem }) => {
       )} />
 
       {/* Output Selector */}
-      <div className="relative z-10 mb-4 w-full px-2">
+      <div className="relative z-10 mb-2 w-full px-2">
         <select 
           value={stem.output}
           onChange={(e) => setStemOutput(stem.id, parseInt(e.target.value))}
-          className="w-full bg-white/5 text-[9px] font-black text-white/60 border border-white/10 rounded-lg px-2 py-1 outline-none focus:border-[#00a3ff] focus:text-white transition-all appearance-none cursor-pointer hover:bg-white/10 text-center"
+          className="w-full bg-white/5 text-[9px] font-black text-white/60 border border-white/10 rounded-lg px-2 py-0.5 outline-none focus:border-[#00a3ff] focus:text-white transition-all appearance-none cursor-pointer hover:bg-white/10 text-center"
         >
           <option value={1}>L (Click)</option>
           <option value={2}>R (Tracks)</option>
@@ -37,7 +37,7 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({ stem }) => {
       </div>
 
       {/* 3-Band EQ */}
-      <div className="flex flex-col gap-3 py-2 w-full px-3 mb-4 z-10 bg-white/[0.02] border-t border-b border-white/5">
+      <div className="flex flex-col gap-2 py-2 w-full px-3 mb-2 z-10 bg-white/[0.02] border-t border-b border-white/5">
         {['high', 'mid', 'low'].map((band) => {
           const value = stem.eq?.[band as keyof typeof stem.eq] || 0;
           // Calculate percentage for visual bar (from -24 to +24)
@@ -82,9 +82,9 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({ stem }) => {
       </div>
 
       {/* Fader Area */}
-      <div className="flex-1 relative flex flex-col items-center w-full z-10">
+      <div className="flex-1 relative flex flex-col items-center w-full z-10 pt-2 pb-2">
         {/* VU Meter Container */}
-        <div className="absolute left-3 top-0 bottom-0 w-2 bg-black rounded-full overflow-hidden border border-white/5 shadow-inner">
+        <div className="absolute left-3 top-2 bottom-2 w-2 bg-black rounded-full overflow-hidden border border-white/5 shadow-inner">
           <motion.div 
             className="w-full bg-gradient-to-t from-[#2ECC71] via-[#F1C40F] to-[#E74C3C] shadow-[0_0_10px_rgba(46,204,113,0.5)]"
             animate={{ 
@@ -123,7 +123,7 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({ stem }) => {
           {/* Custom Fader Thumb */}
           <motion.div 
             className={cn(
-              "absolute w-8 h-12 rounded-lg shadow-2xl z-10 pointer-events-none flex flex-col items-center justify-center gap-1.5 border border-white/20 transition-colors duration-300",
+              "absolute w-8 h-10 rounded-lg shadow-2xl z-10 pointer-events-none flex flex-col items-center justify-center gap-1.5 border border-white/20 transition-colors duration-300",
               stem.isMuted ? "bg-white/10" : "bg-gradient-to-br from-[#00A3FF] to-[#0066FF]"
             )}
             style={{ bottom: `${stem.volume * 100}%`, transform: 'translateY(50%)' }}
@@ -142,15 +142,15 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({ stem }) => {
       </div>
 
       {/* Solo/Mute Buttons */}
-      <div className="mt-10 flex flex-col gap-3 z-10">
+      <div className="mt-3 flex flex-col gap-1.5 z-10 px-2 w-full">
         <motion.button
           whileTap={{ scale: 0.9 }}
           onClick={() => toggleStemSolo(stem.id)}
           className={cn(
-            "w-10 h-10 rounded-2xl border text-[11px] font-black flex items-center justify-center transition-all shadow-lg",
+            "w-full py-1.5 rounded-full border text-[9px] font-black flex items-center justify-center transition-all shadow-md tracking-wider uppercase",
             stem.isSoloed 
               ? "bg-[#F1C40F] border-[#F1C40F] text-black shadow-[#F1C40F]/20" 
-              : "bg-white/5 border-white/10 text-white/40 hover:border-[#F1C40F]/50 hover:text-[#F1C40F]"
+              : "bg-transparent border-white/10 text-white/40 hover:border-white/20 hover:text-white"
           )}
         >
           SOLO
@@ -159,10 +159,10 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({ stem }) => {
           whileTap={{ scale: 0.9 }}
           onClick={() => toggleStemMute(stem.id)}
           className={cn(
-            "w-10 h-10 rounded-2xl border text-[11px] font-black flex items-center justify-center transition-all shadow-lg",
+            "w-full py-1.5 rounded-full border text-[9px] font-black flex items-center justify-center transition-all shadow-md tracking-wider uppercase",
             stem.isMuted 
               ? "bg-[#E74C3C] border-[#E74C3C] text-white shadow-[#E74C3C]/20" 
-              : "bg-white/5 border-white/10 text-white/40 hover:border-[#E74C3C]/50 hover:text-[#E74C3C]"
+              : "bg-transparent border-white/10 text-white/40 hover:border-[#E74C3C]/50 hover:text-[#E74C3C]"
           )}
         >
           MUTE
@@ -170,7 +170,7 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({ stem }) => {
       </div>
 
       {/* Label */}
-      <div className="mt-6 px-3 w-full z-10">
+      <div className="mt-3 px-2 w-full z-10 relative">
         <div className={cn(
           "py-2 rounded-xl border flex items-center justify-center transition-all duration-500",
           stem.isMuted ? "bg-white/5 border-white/5" : "bg-white/10 border-white/10 shadow-lg"

@@ -3,13 +3,18 @@ import { PlayerState, Song } from '../types';
 import { audioEngine } from '../services/audioEngine';
 import { storageEngine } from '../services/storageEngine';
 
+let lastTaps: number[] = [];
+
 export const usePlayerStore = create<PlayerState>((set, get) => ({
   isAuthenticated: false,
   isStageMode: false,
   isLoadingSong: false,
   isSidebarOpen: false,
+  preloadingSongId: null,
+  preloadedSongIds: [],
   activePadKey: null,
   padVolume: 0.5,
+  customPads: {},
   currentSong: null,
   isPlaying: false,
   currentTime: 0,
@@ -21,15 +26,15 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   playbackRate: 1.0,
   metronomeEnabled: false,
   isLRSplit: false,
+  pitchShift: 0,
 
   initPersistence: async () => {
     try {
       const savedSongs = await storageEngine.loadSongs();
       if (savedSongs && savedSongs.length > 0) {
         set({ setlist: savedSongs });
-        // Optional: auto-load the first song if needed, 
-        // but wait for user to click it so we don't block main thread too much
       }
+      get().loadCustomPads();
     } catch (e) {
       console.error("Failed to init storage", e);
     }
@@ -74,6 +79,14 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
        audioEngine.clearStems();
        
        const loadPromises = song.stems.map(async (stem) => {
+         // Try cache first
+         const duration = await audioEngine.loadStemFromCache(stem.id);
+         if (duration !== null) {
+            audioEngine.setStemVolume(stem.id, stem.volume);
+            audioEngine.setStemPan(stem.id, stem.output === 1 ? -1 : stem.output === 2 ? 1 : 0);
+            return;
+         }
+
          if (stem.originalFile) {
             await audioEngine.loadStem(stem.id, stem.originalFile);
             audioEngine.setStemVolume(stem.id, stem.volume);
@@ -104,9 +117,51 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     } catch (e) {
        console.error("Failed to load song stems on switch", e);
     }
+    
+    // Cleanup cache
+    const { preloadingSongId } = get();
+    const keepStemIds = new Set<string>();
+    song.stems.forEach(s => keepStemIds.add(s.id));
+    if (preloadingSongId) {
+       const preloadingSong = get().setlist.find(s => s.id === preloadingSongId);
+       if (preloadingSong) preloadingSong.stems.forEach(s => keepStemIds.add(s.id));
+    }
+    audioEngine.clearDecodeCache(Array.from(keepStemIds));
 
-    set({ currentSong: song, currentTime: 0, isPlaying: false, playbackRate: 1.0, isLoadingSong: false });
+    set({ currentSong: song, currentTime: 0, isPlaying: false, playbackRate: 1.0, isLoadingSong: false, pitchShift: 0 });
     audioEngine.setPlaybackRate(1.0);
+    audioEngine.setPitchShift(0);
+  },
+
+  preloadSong: async (songId) => {
+    const { setlist, preloadingSongId, preloadedSongIds } = get();
+    if (preloadingSongId === songId || preloadedSongIds.includes(songId)) return;
+    
+    const song = setlist.find(s => s.id === songId);
+    if (!song) return;
+
+    set({ preloadingSongId: songId });
+    
+    try {
+       const loadPromises = song.stems.map(async (stem) => {
+         if (stem.originalFile) {
+            await audioEngine.preloadStem(stem.id, stem.originalFile);
+         } else {
+            const buffer = await storageEngine.loadStemBuffer(stem.id);
+            if (buffer) {
+               await audioEngine.preloadStemFromArrayBuffer(stem.id, buffer);
+            }
+         }
+       });
+       await Promise.all(loadPromises);
+       set(state => ({ preloadedSongIds: [...state.preloadedSongIds, songId] }));
+    } catch(e) {
+       console.error("Failed to preload", e);
+    } finally {
+       if (get().preloadingSongId === songId) {
+         set({ preloadingSongId: null });
+       }
+    }
   },
 
   updatePeaks: (peaks: number[]) => {
@@ -148,11 +203,76 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     set({ playbackRate: rate });
   },
 
+  setPitchShift: (semitones) => {
+    audioEngine.setPitchShift(semitones);
+    set({ pitchShift: semitones });
+  },
+
   toggleMetronome: () => {
     const { metronomeEnabled, currentSong } = get();
     const newState = !metronomeEnabled;
-    audioEngine.toggleMetronome(newState, currentSong?.bpm || 120);
+    audioEngine.toggleMetronome(newState, currentSong?.bpm || 120, currentSong?.timeSignature || "4/4");
     set({ metronomeEnabled: newState });
+  },
+
+  tapTempo: () => {
+    const now = performance.now();
+    
+    // Reset taps if more than 2 seconds have passed since last tap
+    if (lastTaps.length > 0 && now - lastTaps[lastTaps.length - 1] > 2000) {
+      lastTaps = [];
+    }
+    
+    lastTaps.push(now);
+    
+    // Calculate average BPM if we have at least 2 taps (preferably 3 or 4)
+    if (lastTaps.length >= 2) {
+      const diffs = [];
+      for (let i = 1; i < lastTaps.length; i++) {
+        diffs.push(lastTaps[i] - lastTaps[i - 1]);
+      }
+      const avgDiff = diffs.reduce((a, b) => a + b, 0) / diffs.length;
+      
+      let newBpm = Math.round(60000 / avgDiff);
+      // Clamp reasonable BPM
+      newBpm = Math.max(30, Math.min(newBpm, 300));
+      
+      const { currentSong, metronomeEnabled, setlist } = get();
+      if (currentSong) {
+        const timeSig = currentSong.timeSignature || "4/4";
+        audioEngine.updateMetronomeParams(newBpm, timeSig);
+        
+        const updatedSong = { ...currentSong, bpm: newBpm };
+        const newSetlist = setlist.map(s => s.id === updatedSong.id ? updatedSong : s);
+        storageEngine.saveSong(updatedSong, []);
+        
+        set({ currentSong: updatedSong, setlist: newSetlist });
+      }
+    }
+    
+    // Keep max 5 taps for moving average
+    if (lastTaps.length > 5) {
+      lastTaps.shift();
+    }
+  },
+
+  cycleTimeSignature: () => {
+    const { currentSong, setlist } = get();
+    if (!currentSong) return;
+
+    // Common time signatures
+    const signatures = ["4/4", "3/4", "6/8", "2/4"];
+    const currentIdx = signatures.indexOf(currentSong.timeSignature || "4/4");
+    const nextIdx = (currentIdx + 1) % signatures.length;
+    const nextSig = signatures[nextIdx];
+
+    audioEngine.updateMetronomeParams(currentSong.bpm, nextSig);
+    
+    const updatedSong = { ...currentSong, timeSignature: nextSig };
+    const newSetlist = setlist.map(s => s.id === updatedSong.id ? updatedSong : s);
+    storageEngine.saveSong(updatedSong, []);
+    
+    set({ currentSong: updatedSong, setlist: newSetlist });
   },
 
   toggleLRSplit: () => {
@@ -294,7 +414,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
        audioEngine.stopPad();
        set({ activePadKey: null });
     } else {
-       audioEngine.playPad(frequency, padVolume);
+       if (audioEngine.hasCustomPad(key)) {
+         audioEngine.playCustomPad(key, padVolume);
+       } else {
+         audioEngine.playPad(frequency, padVolume);
+       }
        set({ activePadKey: key });
     }
   },
@@ -302,6 +426,39 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   setPadVolume: (volume) => {
     audioEngine.setPadVolume(volume);
     set({ padVolume: volume });
+  },
+
+  loadCustomPads: async () => {
+    try {
+      const keys = await storageEngine.getCustomPadNotes();
+      const customPadsMap: Record<string, boolean> = {};
+      for (const k of keys) {
+        customPadsMap[k] = true;
+        const buffer = await storageEngine.loadPadBuffer(k);
+        if (buffer) {
+          await audioEngine.preloadCustomPad(k, buffer);
+        }
+      }
+      set({ customPads: customPadsMap });
+    } catch(e) {
+      console.error("Failed to load custom pads", e);
+    }
+  },
+
+  setCustomPad: async (note: string, file: File) => {
+    try {
+      const buffer = await file.arrayBuffer();
+      await storageEngine.savePadBuffer(note, buffer);
+      
+      // Load into memory
+      await audioEngine.preloadCustomPad(note, buffer.slice(0));
+      
+      set(state => ({
+        customPads: { ...state.customPads, [note]: true }
+      }));
+    } catch(e) {
+      console.error("Failed to set custom pad", e);
+    }
   }
 }));
 

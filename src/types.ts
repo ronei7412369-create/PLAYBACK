@@ -44,6 +44,8 @@ export interface PlayerState {
   isStageMode: boolean;
   isLoadingSong: boolean;
   isSidebarOpen: boolean;
+  preloadingSongId?: string | null;
+  preloadedSongIds: string[];
 
   currentSong: Song | null;
   isPlaying: boolean;
@@ -58,10 +60,12 @@ export interface PlayerState {
   playbackRate: number; // Tempo
   metronomeEnabled: boolean;
   isLRSplit: boolean; // Stereo vs L/R Mode
+  pitchShift: number; // Semitones (-12 to 12)
   
   // Pad parameters
   activePadKey: string | null;
   padVolume: number;
+  customPads: Record<string, boolean>;
 
   // Actions
   login: () => void;
@@ -75,17 +79,24 @@ export interface PlayerState {
 
   toggleAmbientPad: (key: string, frequency: number) => void;
   setPadVolume: (volume: number) => void;
+  setCustomPad: (note: string, file: File) => Promise<void>;
+  loadCustomPads: () => Promise<void>;
 
   importSong: (song: Song, buffers?: {id:string, buffer:ArrayBuffer}[]) => void;
   setCurrentSong: (song: Song) => Promise<void>;
+  preloadSong: (songId: string) => Promise<void>;
   updatePeaks?: (peaks: number[]) => void;
   togglePlay: () => void;
   stop: () => void;
   seek: (time: number) => void;
   setMasterVolume: (volume: number) => void;
   setPlaybackRate: (rate: number) => void;
+  setPitchShift: (semitones: number) => void;
   toggleMetronome: () => void;
   toggleLRSplit: () => void;
+  
+  tapTempo: () => void;
+  cycleTimeSignature: () => void;
   
   toggleLoop: () => void;
   toggleInfiniteLoop: () => void;

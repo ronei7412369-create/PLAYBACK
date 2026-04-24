@@ -74,6 +74,39 @@ export class StorageEngine {
     });
   }
 
+  async savePadBuffer(note: string, buffer: ArrayBuffer): Promise<void> {
+    if (!this.db) await this.init();
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['stems'], 'readwrite');
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = (err) => reject(err);
+      transaction.objectStore('stems').put({ id: `pad-${note}`, buffer });
+    });
+  }
+
+  async loadPadBuffer(note: string): Promise<ArrayBuffer | null> {
+    if (!this.db) await this.init();
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['stems'], 'readonly');
+      const request = transaction.objectStore('stems').get(`pad-${note}`);
+      request.onsuccess = () => resolve(request.result ? request.result.buffer : null);
+      request.onerror = (err) => reject(err);
+    });
+  }
+
+  async getCustomPadNotes(): Promise<string[]> {
+    if (!this.db) await this.init();
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['stems'], 'readonly');
+      const request = transaction.objectStore('stems').getAllKeys();
+      request.onsuccess = () => {
+         const keys = request.result as string[];
+         resolve(keys.filter(k => k.startsWith('pad-')).map(k => k.replace('pad-', '')));
+      };
+      request.onerror = (err) => reject(err);
+    });
+  }
+
   async clearAll(): Promise<void> {
     if (!this.db) await this.init();
     

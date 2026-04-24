@@ -5,7 +5,7 @@ import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 
 export const Header: React.FC = () => {
-  const { currentSong, masterVolume, setMasterVolume, isPlaying, toggleMetronome, metronomeEnabled, isLRSplit, toggleLRSplit, isStageMode, toggleStageMode, logout, isSidebarOpen, setShowSidebar } = usePlayerStore();
+  const { currentSong, masterVolume, setMasterVolume, isPlaying, toggleMetronome, metronomeEnabled, isLRSplit, toggleLRSplit, isStageMode, toggleStageMode, logout, isSidebarOpen, setShowSidebar, tapTempo, cycleTimeSignature, pitchShift, setPitchShift } = usePlayerStore();
 
   if (!currentSong) return null;
 
@@ -49,21 +49,31 @@ export const Header: React.FC = () => {
 
           {/* Core Controls */}
           <div className="flex items-center gap-2 md:gap-4 xl:gap-8 bg-white/5 px-2 md:px-6 py-1.5 md:py-2.5 rounded-2xl border border-white/5">
-            <button 
-              onClick={toggleMetronome}
-              className={cn(
-                "flex flex-col items-center p-1.5 md:p-2 rounded-xl border transition-colors",
-                metronomeEnabled 
-                  ? "bg-[#00A3FF]/20 border-[#00A3FF]/50 shadow-[0_0_15px_rgba(0,163,255,0.3)]" 
-                  : "border-transparent hover:bg-white/10"
-              )}
-            >
-              <div className="flex items-center gap-1.5 text-white/40 md:mb-0.5">
-                <Clock size={11} className={metronomeEnabled ? "text-[#00A3FF]" : ""} />
-                <span className="text-[9px] uppercase font-black tracking-tighter hidden lg:inline">Click</span>
-              </div>
-              <span className={cn("font-black text-sm md:text-lg tabular-nums transition-colors", metronomeEnabled ? "text-[#00A3FF]" : "text-white")}>{currentSong.bpm}</span>
-            </button>
+            <div className="flex group">
+               <button 
+                 onClick={toggleMetronome}
+                 className={cn(
+                   "flex flex-col items-center p-1.5 md:p-2 rounded-l-xl border-y border-l transition-colors",
+                   metronomeEnabled 
+                     ? "bg-[#00A3FF]/20 border-[#00A3FF]/50 shadow-[0_0_15px_rgba(0,163,255,0.3)]" 
+                     : "border-transparent bg-transparent hover:bg-white/10 hover:border-white/10"
+                 )}
+               >
+                 <div className="flex items-center gap-1.5 text-white/40 md:mb-0.5">
+                   <Clock size={11} className={metronomeEnabled ? "text-[#00A3FF]" : ""} />
+                   <span className="text-[9px] uppercase font-black tracking-tighter hidden lg:inline">Click</span>
+                 </div>
+                 <span className={cn("font-black text-sm md:text-lg tabular-nums transition-colors", metronomeEnabled ? "text-[#00A3FF]" : "text-white")}>{currentSong.bpm}</span>
+               </button>
+               <button 
+                 onClick={tapTempo}
+                 className="flex flex-col items-center justify-center px-1.5 md:px-2 border-y border-r border-transparent bg-transparent hover:bg-white/10 hover:border-white/10 rounded-r-xl transition-colors text-white/40 hover:text-white"
+                 title="Tap Tempo"
+                 style={{ writingMode: 'vertical-rl' }}
+               >
+                 <span className="text-[9px] uppercase font-black tracking-widest rotate-180 flex items-center">TAP</span>
+               </button>
+            </div>
 
             <button 
               onClick={toggleLRSplit}
@@ -83,22 +93,40 @@ export const Header: React.FC = () => {
 
             <div className="hidden sm:block w-[1px] h-6 bg-white/10" />
 
-            <div className="hidden sm:flex flex-col items-center">
+            <button 
+              onClick={cycleTimeSignature}
+              className="hidden sm:flex flex-col items-center hover:bg-white/10 p-1.5 md:p-2 rounded-xl border border-transparent hover:border-white/5 transition-colors cursor-pointer"
+              title="Change Time Signature"
+            >
               <div className="flex items-center gap-1.5 text-white/40 mb-0.5">
                 <Hash size={11} />
                 <span className="text-[9px] uppercase font-black tracking-tighter">Sig</span>
               </div>
-              <span className="text-white font-black text-sm md:text-xl tabular-nums">{currentSong.timeSignature}</span>
-            </div>
+              <span className="text-white font-black text-sm md:text-xl tabular-nums">{currentSong.timeSignature || "4/4"}</span>
+            </button>
 
             <div className="hidden sm:block w-[1px] h-6 bg-white/10" />
 
             <div className="flex flex-col items-center p-1.5 md:p-0 border border-transparent">
               <div className="flex items-center gap-1.5 text-white/40 md:mb-0.5">
                 <Key size={11} />
-                <span className="text-[9px] uppercase font-black tracking-tighter hidden lg:inline">Key</span>
+                <span className="text-[9px] uppercase font-black tracking-tighter hidden lg:inline">Tone</span>
               </div>
-              <span className="text-[#F1C40F] font-black text-sm md:text-xl tabular-nums">{currentSong.key}</span>
+              <div className="flex items-center gap-1.5">
+                <button 
+                  onClick={() => setPitchShift(Math.max(-12, pitchShift - 1))}
+                  className="text-white/40 hover:text-white px-1 font-black transition-colors disabled:opacity-30"
+                  disabled={pitchShift <= -12}
+                >-</button>
+                <span className="text-[#F1C40F] font-black text-sm md:text-xl tabular-nums min-w-[30px] text-center">
+                  {pitchShift > 0 ? `+${pitchShift}` : pitchShift}
+                </span>
+                <button 
+                  onClick={() => setPitchShift(Math.min(12, pitchShift + 1))}
+                  className="text-white/40 hover:text-white px-1 font-black transition-colors disabled:opacity-30"
+                  disabled={pitchShift >= 12}
+                >+</button>
+              </div>
             </div>
           </div>
         </div>

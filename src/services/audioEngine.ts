@@ -1,7 +1,10 @@
 
+import * as Tone from 'tone';
+
 export class AudioEngine {
   private context: AudioContext;
   public masterGain: GainNode;
+  private pitchShift: any; // using any for Tone node
   private stems: Map<string, { 
     buffer: AudioBuffer; 
     gain: GainNode; 
@@ -20,6 +23,8 @@ export class AudioEngine {
   // Metronome state
   private clickTrackEnabled: boolean = false;
   private bpm: number = 120;
+  private timeSignature: [number, number] = [4, 4];
+  private currentBeat: number = 0;
   private nextClickTime: number = 0;
   private clickTimerId: number | null = null;
   private clickGain: GainNode;
@@ -27,19 +32,71 @@ export class AudioEngine {
   // Pad State
   private padGain: GainNode;
   private padOscillators: OscillatorNode[] = [];
+  private customPadBufferNode: AudioBufferSourceNode | null = null;
+  private padDecodedCache: Map<string, AudioBuffer> = new Map();
+
+  private stemDuration: number = 0;
+  private decodedCache: Map<string, AudioBuffer> = new Map();
 
   constructor() {
     this.context = new (window.AudioContext || (window as any).webkitAudioContext)();
+    
+    // Set up Tone.js using our native context
+    Tone.setContext(this.context);
+    
+    // Create PitchShift node
+    this.pitchShift = new Tone.PitchShift({
+      pitch: 0,
+      windowSize: 0.1,
+      delayTime: 0,
+      feedback: 0
+    });
+
     this.masterGain = this.context.createGain();
-    this.masterGain.connect(this.context.destination);
+    
+    // Connect Master -> PitchShift -> Destination
+    Tone.connect(this.masterGain, this.pitchShift);
+    Tone.connect(this.pitchShift, this.context.destination);
 
     this.clickGain = this.context.createGain();
     this.clickGain.gain.value = 0.8;
-    this.clickGain.connect(this.context.destination);
+    this.clickGain.connect(this.context.destination); // Click bypasses pitch shift
 
     this.padGain = this.context.createGain();
     this.padGain.gain.value = 0;
     this.padGain.connect(this.masterGain);
+  }
+
+  public setPitchShift(semitones: number) {
+    if (this.pitchShift) {
+      this.pitchShift.pitch = semitones;
+    }
+  }
+
+  public async preloadCustomPad(note: string, arrayBuffer: ArrayBuffer) {
+     const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
+     this.padDecodedCache.set(note, audioBuffer);
+  }
+
+  public hasCustomPad(note: string): boolean {
+     return this.padDecodedCache.has(note);
+  }
+
+  public playCustomPad(note: string, masterVolume: number) {
+     this.stopPad(); 
+
+     const audioBuffer = this.padDecodedCache.get(note);
+     if (!audioBuffer) return;
+
+     this.padGain.gain.cancelScheduledValues(this.context.currentTime);
+     this.padGain.gain.setValueAtTime(0, this.context.currentTime);
+     this.padGain.gain.linearRampToValueAtTime(masterVolume, this.context.currentTime + 1.5);
+
+     this.customPadBufferNode = this.context.createBufferSource();
+     this.customPadBufferNode.buffer = audioBuffer;
+     this.customPadBufferNode.loop = true;
+     this.customPadBufferNode.connect(this.padGain);
+     this.customPadBufferNode.start();
   }
 
   public playPad(frequency: number, masterVolume: number) {
@@ -92,12 +149,17 @@ export class AudioEngine {
 
     const oscToStop = [...this.padOscillators];
     this.padOscillators = [];
+    const customNodeToStop = this.customPadBufferNode;
+    this.customPadBufferNode = null;
 
     // Stop them after the fade-out completes
     setTimeout(() => {
       oscToStop.forEach(osc => {
          try { osc.stop(); osc.disconnect(); } catch (e) {}
       });
+      if (customNodeToStop) {
+         try { customNodeToStop.stop(); customNodeToStop.disconnect(); } catch (e) {}
+      }
     }, 2000);
   }
 
@@ -108,8 +170,69 @@ export class AudioEngine {
     }
   }
 
+  public async loadStemFromCache(id: string): Promise<number | null> {
+    const audioBuffer = this.decodedCache.get(id);
+    if (!audioBuffer) return null;
+
+    // Create Nodes
+    const gain = this.context.createGain();
+    const panner = this.context.createStereoPanner();
+    
+    const eqLow = this.context.createBiquadFilter();
+    eqLow.type = 'lowshelf';
+    eqLow.frequency.value = 320; // 320 Hz
+    eqLow.gain.value = 0;
+
+    const eqMid = this.context.createBiquadFilter();
+    eqMid.type = 'peaking';
+    eqMid.frequency.value = 1000; // 1kHz
+    eqMid.Q.value = 0.5;
+    eqMid.gain.value = 0;
+
+    const eqHigh = this.context.createBiquadFilter();
+    eqHigh.type = 'highshelf';
+    eqHigh.frequency.value = 3200; // 3.2kHz
+    eqHigh.gain.value = 0;
+    
+    // Connect Chain: Source -> Gain -> EQ Low -> EQ Mid -> EQ High -> Panner -> Master
+    gain.connect(eqLow);
+    eqLow.connect(eqMid);
+    eqMid.connect(eqHigh);
+    eqHigh.connect(panner);
+    panner.connect(this.masterGain);
+
+    this.stems.set(id, { buffer: audioBuffer, gain, panner, eqLow, eqMid, eqHigh, source: null });
+    return audioBuffer.duration;
+  }
+
+  public async preloadStemFromArrayBuffer(id: string, arrayBuffer: ArrayBuffer) {
+    if (!this.decodedCache.has(id)) {
+      const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
+      this.decodedCache.set(id, audioBuffer);
+    }
+  }
+
+  public async preloadStem(id: string, file: File) {
+    if (!this.decodedCache.has(id)) {
+      const arrayBuffer = await file.arrayBuffer();
+      await this.preloadStemFromArrayBuffer(id, arrayBuffer);
+    }
+  }
+
+  public clearDecodeCache(excludeStemIds: string[]) {
+    for (const [id] of this.decodedCache.entries()) {
+      if (!excludeStemIds.includes(id)) {
+        this.decodedCache.delete(id);
+      }
+    }
+  }
+
   public async loadStemFromArrayBuffer(id: string, arrayBuffer: ArrayBuffer): Promise<number> {
-    const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
+    let audioBuffer = this.decodedCache.get(id);
+    if (!audioBuffer) {
+      audioBuffer = await this.context.decodeAudioData(arrayBuffer);
+      this.decodedCache.set(id, audioBuffer);
+    }
     
     // Create Nodes
     const gain = this.context.createGain();
@@ -189,6 +312,11 @@ export class AudioEngine {
     });
 
     this.isPlaying = true;
+    
+    // Reset or calculate currentBeat if needed. If starting from beginning, beat is 0.
+    // If starting from an offset, calculate the initial beat
+    const beatsPassed = (offset / 60.0) * this.bpm;
+    this.currentBeat = Math.floor(beatsPassed) % Math.max(1, this.timeSignature[0]);
 
     if (this.clickTrackEnabled) {
       this.nextClickTime = this.context.currentTime;
@@ -275,9 +403,15 @@ export class AudioEngine {
     }
   }
 
-  public toggleMetronome(enabled: boolean, bpm: number) {
+  public toggleMetronome(enabled: boolean, bpm: number, timeSignatureStr: string = "4/4") {
     this.clickTrackEnabled = enabled;
     this.bpm = bpm;
+    
+    const parts = timeSignatureStr.split('/');
+    if (parts.length === 2) {
+      this.timeSignature = [parseInt(parts[0], 10) || 4, parseInt(parts[1], 10) || 4];
+    }
+
     if (enabled && this.isPlaying) {
       this.nextClickTime = this.context.currentTime;
       this.scheduleMetronome();
@@ -287,20 +421,32 @@ export class AudioEngine {
     }
   }
 
+  public updateMetronomeParams(bpm: number, timeSignatureStr: string) {
+    this.bpm = bpm;
+    const parts = timeSignatureStr.split('/');
+    if (parts.length === 2) {
+      this.timeSignature = [parseInt(parts[0], 10) || 4, parseInt(parts[1], 10) || 4];
+    }
+  }
+
   private scheduleMetronome() {
     if (!this.isPlaying || !this.clickTrackEnabled) return;
     
     const secondsPerBeat = 60.0 / (this.bpm * this.playbackRate);
     // Lookahead scheduling
     while (this.nextClickTime < this.context.currentTime + 0.1) {
-      this.playClick(this.nextClickTime);
+      // Determine if beat is accented
+      const isAccent = this.currentBeat === 0;
+      this.playClick(this.nextClickTime, isAccent);
+      
       this.nextClickTime += secondsPerBeat;
+      this.currentBeat = (this.currentBeat + 1) % this.timeSignature[0];
     }
     
     this.clickTimerId = window.setTimeout(() => this.scheduleMetronome(), 25);
   }
 
-  private playClick(time: number) {
+  private playClick(time: number, isAccent: boolean) {
     const osc = this.context.createOscillator();
     const env = this.context.createGain();
     
@@ -308,8 +454,8 @@ export class AudioEngine {
     env.connect(this.clickGain);
     
     // Beat frequency
-    osc.frequency.setValueAtTime(800, time);
-    env.gain.setValueAtTime(1, time);
+    osc.frequency.setValueAtTime(isAccent ? 1200 : 800, time);
+    env.gain.setValueAtTime(isAccent ? 1 : 0.6, time);
     env.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
     
     osc.start(time);
