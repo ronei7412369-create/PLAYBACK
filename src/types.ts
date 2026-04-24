@@ -41,6 +41,7 @@ export interface Song {
 export interface PlayerState {
   // App State
   isAuthenticated: boolean;
+  user: any | null; // Firebase user
   isStageMode: boolean;
   isLoadingSong: boolean;
   isSidebarOpen: boolean;

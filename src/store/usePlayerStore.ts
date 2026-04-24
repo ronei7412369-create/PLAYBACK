@@ -3,10 +3,20 @@ import { PlayerState, Song } from '../types';
 import { audioEngine } from '../services/audioEngine';
 import { storageEngine } from '../services/storageEngine';
 
+import { auth, signInWithGoogle, signOut } from '../services/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+
 let lastTaps: number[] = [];
 
-export const usePlayerStore = create<PlayerState>((set, get) => ({
+export const usePlayerStore = create<PlayerState>((set, get) => {
+  // Listen to Firebase auth state
+  onAuthStateChanged(auth, (user) => {
+    set({ isAuthenticated: !!user, user });
+  });
+
+  return {
   isAuthenticated: false,
+  user: null,
   isStageMode: false,
   isLoadingSong: false,
   isSidebarOpen: false,
@@ -351,8 +361,20 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     return newState;
   }),
   
-  login: () => set({ isAuthenticated: true }),
-  logout: () => set({ isAuthenticated: false }),
+  login: async () => {
+    try {
+      await signInWithGoogle();
+    } catch (e) {
+      console.error("Login failed", e);
+    }
+  },
+  logout: async () => {
+    try {
+      await signOut();
+    } catch (e) {
+      console.error("Logout failed", e);
+    }
+  },
   toggleStageMode: () => set((state) => ({ isStageMode: !state.isStageMode })),
   setShowSidebar: (show) => set({ isSidebarOpen: show }),
 
@@ -460,6 +482,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       console.error("Failed to set custom pad", e);
     }
   }
-}));
+  };
+});
 
 
