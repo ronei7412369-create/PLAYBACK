@@ -1,13 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { usePlayerStore } from '../store/usePlayerStore';
-import { Edit2, Save, X } from 'lucide-react';
+import { Edit2, Save, X, Sparkles, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import ReactMarkdown from 'react-markdown';
+import { generateLyricsAndChords } from '../services/autoLyrics';
 
 export const Teleprompter: React.FC = () => {
   const { currentSong, currentTime, updateSongLyrics } = usePlayerStore();
   const [isEditing, setIsEditing] = useState(false);
   const [localLyrics, setLocalLyrics] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -16,15 +18,12 @@ export const Teleprompter: React.FC = () => {
     } else {
       setLocalLyrics('## Your Lyrics Here\n\n```\n[C]       [G]\nAmazing Grace, how sweet the sound\n```\n\nEdit to add your content.');
     }
-  }, [currentSong?.id]); // Reset when song changes
+  }, [currentSong?.id]);
 
-  // Auto-scroll logic based on percentage of song completion
-  // This is a naive scroll, can be improved to use marker-based scrolling 
   useEffect(() => {
     if (!isEditing && scrollContainerRef.current && currentSong && currentSong.duration > 0) {
       const el = scrollContainerRef.current;
       const progress = currentTime / currentSong.duration;
-      // We subtract clientHeight so it scrolls the "viewport" down the content
       const maxScroll = el.scrollHeight - el.clientHeight;
       if (maxScroll > 0) {
          el.scrollTop = progress * maxScroll;
@@ -39,6 +38,22 @@ export const Teleprompter: React.FC = () => {
     }
   };
 
+  const handleAutoGenerate = async () => {
+    if (!currentSong) return;
+    setIsGenerating(true);
+    try {
+      const result = await generateLyricsAndChords(currentSong.title, currentSong.artist);
+      setLocalLyrics(result);
+      updateSongLyrics(currentSong.id, result);
+      setIsEditing(false);
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao buscar letra.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   if (!currentSong) return null;
 
   return (
@@ -49,24 +64,36 @@ export const Teleprompter: React.FC = () => {
             <button 
               onClick={() => setIsEditing(false)}
               className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/50 border border-white/10"
+              title="Cancelar"
             >
               <X size={16} />
             </button>
             <button 
               onClick={handleSave}
               className="p-2 bg-[#00A3FF] hover:bg-[#0090FF] rounded-lg text-white border border-[#00A3FF]"
+              title="Salvar"
             >
               <Save size={16} />
             </button>
           </>
         ) : (
-          <button 
-            onClick={() => setIsEditing(true)}
-            className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/50 border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity"
-            // Make button show on hover of the container by giving the parent "group" class
-          >
-            <Edit2 size={16} />
-          </button>
+          <>
+            <button 
+              onClick={handleAutoGenerate}
+              disabled={isGenerating}
+              className="p-2 bg-purple-500/20 hover:bg-purple-500/40 rounded-lg text-purple-400 border border-purple-500/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2"
+              title="Letra Automática com IA"
+            >
+              {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+            </button>
+            <button 
+              onClick={() => setIsEditing(true)}
+              className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/50 border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity"
+              title="Editar Manualmente"
+            >
+              <Edit2 size={16} />
+            </button>
+          </>
         )}
       </div>
 
@@ -85,11 +112,11 @@ export const Teleprompter: React.FC = () => {
             placeholder="Paste your lyrics/chords here..."
           />
         ) : (
-          <div className="max-w-2xl mx-auto pb-40">
-             <div className="markdown-body text-xl md:text-3xl font-bold leading-relaxed text-center">
+          <div className="max-w-2xl mx-auto pb-10">
+             <div className="markdown-body text-xl md:text-3xl font-bold leading-relaxed text-center text-white">
                 <ReactMarkdown
                    components={{
-                     code({node, inline, className, children, ...props}: any) {
+                     code({node, className, children, ...props}: any) {
                         return <pre className="text-[#00A3FF] font-mono text-lg md:text-2xl whitespace-pre-wrap">{children}</pre>;
                      },
                      h2({children}) {
@@ -97,7 +124,7 @@ export const Teleprompter: React.FC = () => {
                      }
                    }}
                 >
-                  {currentSong.lyrics || '## No Lyrics Added\nClick edit to add lyrics and chords.'}
+                  {currentSong.lyrics || '## Sem Letra\nClique em editar ou use a IA para adicionar.'}
                 </ReactMarkdown>
              </div>
           </div>

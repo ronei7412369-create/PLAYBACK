@@ -18,19 +18,23 @@ export const signInWithGoogle = async () => {
     const userDoc = await getDoc(userRef);
     
     if (!userDoc.exists()) {
-      await setDoc(userRef, {
+      const data: any = {
         email: user.email,
-        displayName: user.displayName,
-        photoURL: user.photoURL,
         createdAt: serverTimestamp(),
         lastLogin: serverTimestamp()
-      });
+      };
+      if (user.displayName) data.displayName = user.displayName;
+      if (user.photoURL) data.photoURL = user.photoURL;
+      
+      await setDoc(userRef, data);
     } else {
-      await setDoc(userRef, {
+      const data: any = {
         lastLogin: serverTimestamp(),
-        displayName: user.displayName,
-        photoURL: user.photoURL
-      }, { merge: true });
+      };
+      if (user.displayName) data.displayName = user.displayName;
+      if (user.photoURL) data.photoURL = user.photoURL;
+      
+      await setDoc(userRef, data, { merge: true });
     }
     
     return user;
@@ -46,9 +50,20 @@ export const signInWithEmail = async (email: string, password: string) => {
     const user = result.user;
     
     const userRef = doc(db, 'users', user.uid);
-    await setDoc(userRef, {
-      lastLogin: serverTimestamp(),
-    }, { merge: true });
+    const userDoc = await getDoc(userRef);
+    
+    if (!userDoc.exists()) {
+      await setDoc(userRef, {
+        email: user.email,
+        displayName: user.displayName || user.email?.split('@')[0] || 'User',
+        createdAt: serverTimestamp(),
+        lastLogin: serverTimestamp()
+      });
+    } else {
+      await setDoc(userRef, {
+        lastLogin: serverTimestamp(),
+      }, { merge: true });
+    }
     
     return user;
   } catch (error) {
@@ -66,7 +81,6 @@ export const signUpWithEmail = async (email: string, password: string, displayNa
     await setDoc(userRef, {
       email: user.email,
       displayName: displayName || user.email?.split('@')[0],
-      photoURL: null,
       createdAt: serverTimestamp(),
       lastLogin: serverTimestamp()
     });
@@ -90,7 +104,6 @@ export const createInternalUserWithEmail = async (email: string, password: strin
     await setDoc(userRef, {
       email: user.email,
       displayName: displayName || user.email?.split('@')[0],
-      photoURL: null,
       createdAt: serverTimestamp(),
       lastLogin: serverTimestamp()
     });

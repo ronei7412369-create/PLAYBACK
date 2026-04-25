@@ -31,7 +31,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
   currentSong: null,
   isPlaying: false,
   currentTime: 0,
-  masterVolume: 0.8,
+  masterVolume: 1.0,
   masterEq: { low: 0, mid: 0, high: 0 },
   isLooping: false,
   isInfiniteLoop: false,

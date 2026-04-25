@@ -31,18 +31,21 @@ export const AdminModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
     }
   };
 
-  if (!isOpen) return null;
-
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
-          className="bg-[#111112] border border-white/10 rounded-3xl w-full max-w-md overflow-hidden relative shadow-2xl"
+      {isOpen && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          onClick={onClose}
         >
-          <div className="p-6 border-b border-white/5 flex items-center justify-between">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="bg-[#111112] border border-white/10 rounded-3xl w-full max-w-md overflow-hidden relative shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 border-b border-white/5 flex items-center justify-between">
             <h2 className="text-xl font-black text-white tracking-tight">Criar Usuário</h2>
             <button onClick={onClose} className="p-2 text-white/40 hover:text-white transition-colors bg-white/5 rounded-full hover:bg-white/10">
               <X size={20} />
@@ -114,8 +117,9 @@ export const AdminModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
               {isLoading ? 'Criando...' : 'Criar Conta'}
             </button>
           </form>
-        </motion.div>
-      </div>
+          </motion.div>
+        </div>
+      )}
     </AnimatePresence>
   );
 };

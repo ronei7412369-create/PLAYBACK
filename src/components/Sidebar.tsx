@@ -1,20 +1,21 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { usePlayerStore } from '../store/usePlayerStore';
-import { ListMusic, Plus, Trash2, ChevronRight, Upload, Clock } from 'lucide-react';
+import { ListMusic, Plus, Trash2, ChevronRight, Upload, Clock, MessageCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { audioEngine } from '../services/audioEngine';
 import { Song } from '../types';
 import { PlayList } from './PlayList';
+import { TelegramImportModal } from './TelegramImportModal';
 
 export const Sidebar: React.FC = () => {
   const { setlist, currentSong, setCurrentSong, importSong } = usePlayerStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [isImporting, setIsImporting] = React.useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [showTelegramModal, setShowTelegramModal] = useState(false);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []) as File[];
+  const handleFiles = async (files: File[]) => {
     if (files.length === 0) return;
 
     setIsImporting(true);
@@ -39,7 +40,7 @@ export const Sidebar: React.FC = () => {
            loadedStem: {
              id,
              name,
-             buffer: null as any, // Not kept in memory state here, managed by Engine
+             buffer: null as any,
              originalFile: file,
              volume: 1.0,
              isMuted: false,
@@ -90,6 +91,11 @@ export const Sidebar: React.FC = () => {
     }
   };
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []) as File[];
+    handleFiles(files);
+  };
+
   return (
     <aside className="w-80 bg-[#0A0A0B] border-r border-white/5 flex flex-col h-full overflow-hidden relative">
       <div className="p-8 border-b border-white/5 flex items-center justify-between bg-gradient-to-b from-white/5 to-transparent">
@@ -99,16 +105,26 @@ export const Sidebar: React.FC = () => {
           </div>
           <h2 className="text-white font-black uppercase tracking-[0.15em] text-xs">Setlist</h2>
         </div>
-        <button 
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isImporting}
-          className={cn(
-            "p-2 bg-white/5 rounded-xl text-white/40 hover:text-[#00A3FF] hover:bg-[#00A3FF]/10 transition-all border border-white/5",
-            isImporting && "opacity-50 cursor-not-allowed"
-          )}
-        >
-          {isImporting ? <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}><Upload size={18} /></motion.div> : <Plus size={18} />}
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => setShowTelegramModal(true)}
+            disabled={isImporting}
+            title="Importar do Telegram"
+            className="p-2 bg-[#0088CC]/10 rounded-xl text-[#0088CC] hover:bg-[#0088CC]/20 transition-all border border-[#0088CC]/20"
+          >
+            <MessageCircle size={18} />
+          </button>
+          <button 
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isImporting}
+            className={cn(
+              "p-2 bg-white/5 rounded-xl text-white/40 hover:text-[#00A3FF] hover:bg-[#00A3FF]/10 transition-all border border-white/5",
+              isImporting && "opacity-50 cursor-not-allowed"
+            )}
+          >
+            {isImporting ? <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}><Upload size={18} /></motion.div> : <Plus size={18} />}
+          </button>
+        </div>
         <input 
           type="file" 
           ref={fileInputRef} 
@@ -142,6 +158,12 @@ export const Sidebar: React.FC = () => {
           Clear Setlist
         </motion.button>
       </div>
+      
+      <TelegramImportModal 
+        isOpen={showTelegramModal} 
+        onClose={() => setShowTelegramModal(false)}
+        onImport={handleFiles} 
+      />
     </aside>
   );
 };

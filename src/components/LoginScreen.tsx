@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { motion } from 'motion/react';
 import { Mail, Lock } from 'lucide-react';
+import { BackgroundAnimation } from './BackgroundAnimation';
 
 export const LoginScreen: React.FC = () => {
   const { login, loginWithEmail } = usePlayerStore();
@@ -21,13 +22,9 @@ export const LoginScreen: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-[#050506] text-white overflow-hidden relative">
-      {/* Background Image */}
-      <div 
-        className="absolute inset-0 opacity-20 bg-cover bg-center pointer-events-none"
-        style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?q=80&w=2070)' }}
-      />
-      <div className="absolute inset-0 bg-gradient-to-t from-[#050506] via-transparent to-[#050506]" />
+    <div className="flex h-screen bg-[#050505] text-white overflow-hidden relative">
+      <BackgroundAnimation />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-[#050505] pointer-events-none" />
 
       <div className="relative z-10 flex flex-col items-center justify-center w-full h-full max-w-md mx-auto px-6">
         <motion.div 
