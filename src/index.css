@@ -1,1 +1,17 @@
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Orbitron", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer utilities {
+  /* Vertical Light Streaks & CRT Scanlines */
+  .vertical-streaks {
+    background-image: linear-gradient(90deg, transparent 99%, rgba(0, 255, 255, 0.03) 100%);
+    background-size: 10vw 100%;
+  }
+  .crt-scanlines {
+    background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2));
+    background-size: 100% 4px;
+  }
+}

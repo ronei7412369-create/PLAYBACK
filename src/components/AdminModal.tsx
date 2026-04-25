@@ -45,11 +45,16 @@ export const AdminModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
             className="bg-[#111112] border border-white/10 rounded-3xl w-full max-w-md overflow-hidden relative shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-6 border-b border-white/5 flex items-center justify-between">
-            <h2 className="text-xl font-black text-white tracking-tight">Criar Usuário</h2>
-            <button onClick={onClose} className="p-2 text-white/40 hover:text-white transition-colors bg-white/5 rounded-full hover:bg-white/10">
+            {/* Absolute close button requested by user */}
+            <button 
+              onClick={onClose} 
+              className="absolute top-4 right-4 p-2 text-white/50 hover:text-white bg-black/50 hover:bg-white/10 rounded-full transition-all z-50 border border-white/10"
+            >
               <X size={20} />
             </button>
+
+            <div className="p-6 border-b border-white/5 flex items-center justify-between pr-14">
+            <h2 className="text-xl font-black text-white tracking-tight">Criar Usuário</h2>
           </div>
           
           <form onSubmit={handleCreate} className="p-6 flex flex-col gap-5">
