@@ -11,6 +11,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { useMIDI } from './hooks/useMIDI';
 import { cn } from './lib/utils';
 import { Sliders, Type, Grid } from 'lucide-react';
+import { auth } from './services/firebase';
 
 import { Teleprompter } from './components/Teleprompter';
 import { PadsPlayer } from './components/PadsPlayer';
@@ -22,8 +23,8 @@ export default function App() {
   const { 
     isPlaying, currentTime, seek, currentSong, togglePlay, stop, toggleLoop, 
     setPlaybackRate, playbackRate, initPersistence,
-    isAuthenticated, isStageMode, isSidebarOpen
-  } = usePlayerStore();
+    isAuthenticated, hasAccess, isStageMode, isSidebarOpen
+  } = usePlayerStore() as any;
 
   const [mobileView, setMobileView] = useState<MobileView>('mixer');
 
@@ -116,13 +117,21 @@ export default function App() {
           // But since other components rely on currentTime from store, we'll update it.
           usePlayerStore.setState({ currentTime: engTime });
           
-          if (currentSong && currentSong.duration - engTime <= 15) {
+          if (currentSong) {
              const { setlist, preloadingSongId, preloadedSongIds } = usePlayerStore.getState();
              const currentIndex = setlist.findIndex(s => s.id === currentSong.id);
              if (currentIndex !== -1 && currentIndex < setlist.length - 1) {
-                const nextSongId = setlist[currentIndex + 1].id;
-                if (!preloadingSongId && !preloadedSongIds.includes(nextSongId)) {
-                   usePlayerStore.getState().preloadSong(nextSongId);
+                // Preload all remaining songs sequentially, but let's just trigger the next one for now.
+                // Since `preloadSong` will only work if not already `preloadedSongIds`, once it's done,
+                // the next tick won't trigger it again. We could even look ahead to all un-preloaded songs.
+                for (let i = currentIndex + 1; i < setlist.length; i++) {
+                   const nextSongId = setlist[i].id;
+                   if (!preloadedSongIds.includes(nextSongId)) {
+                      if (!preloadingSongId) {
+                         usePlayerStore.getState().preloadSong(nextSongId);
+                      }
+                      break; // Only preload one at a time, wait for it to finish
+                   }
                 }
              }
           }
@@ -143,8 +152,24 @@ export default function App() {
 
   if (!isAuthenticated) return <LoginScreen />;
 
+  if (!hasAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-transparent text-white p-6 text-center">
+        <BackgroundAnimation />
+        <h1 className="text-3xl font-black mb-4">Período de Teste Expirado</h1>
+        <p className="text-white/60 mb-8 max-w-md">Seu período de teste de 3 dias chegou ao fim. Para continuar usando o aplicativo e acessar todas as ferramentas, por favor, realize o pagamento da assinatura mensal.</p>
+        <button onClick={() => window.location.href = 'mailto:ronei7412369@gmail.com'} className="bg-[#00A3FF] hover:bg-[#00A3FF]/80 text-white font-bold py-3 px-8 rounded-full transition-colors mb-4">
+          Renovar Assinatura
+        </button>
+        <button onClick={() => { auth.signOut(); window.location.reload(); }} className="text-white/40 hover:text-white transition-colors">
+          Sair
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col h-screen bg-[#050505] text-white overflow-hidden font-sans select-none relative">
+    <div className="flex flex-col h-screen bg-transparent text-white overflow-hidden font-sans select-none relative">
       <BackgroundAnimation />
       
       <Header />
@@ -232,15 +257,15 @@ export default function App() {
 
                  <div className={cn(
                    "overflow-hidden shrink-0",
-                   "flex-1 sm:flex-none sm:h-[300px] xl:h-[340px]",
-                   "sm:block",
+                   "flex-1 sm:flex-none sm:h-[180px] lg:h-[200px] xl:h-[220px]",
+                   "sm:block transition-all",
                    mobileView !== 'mixer' && "hidden sm:block" 
                  )}>
                    <Mixer />
                  </div>
 
                  <div className={cn(
-                   "flex-1 flex flex-col sm:flex-row gap-4 px-4 pb-4 sm:bg-[#050506]/50 shrink-0",
+                   "flex-1 flex flex-col sm:flex-row gap-4 px-4 pb-4 sm:bg-[#050506]/50 min-h-0",
                    "sm:overflow-hidden overflow-y-auto",
                    (mobileView !== 'teleprompter' && mobileView !== 'pads') && "hidden sm:flex" 
                  )}>

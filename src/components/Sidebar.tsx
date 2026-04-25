@@ -97,7 +97,7 @@ export const Sidebar: React.FC = () => {
   };
 
   return (
-    <aside className="w-80 bg-[#0A0A0B] border-r border-white/5 flex flex-col h-full overflow-hidden relative">
+    <aside className="w-80 bg-[#0A0A0B]/60 backdrop-blur-md border-r border-white/5 flex flex-col h-full overflow-hidden relative">
       <div className="p-8 border-b border-white/5 flex items-center justify-between bg-gradient-to-b from-white/5 to-transparent">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-[#00A3FF]/10 rounded-lg flex items-center justify-center">
@@ -139,7 +139,7 @@ export const Sidebar: React.FC = () => {
          <PlayList />
       </div>
 
-      <div className="p-8 bg-[#050506] border-t border-white/5 relative overflow-hidden">
+      <div className="p-8 bg-[#050505]/40 backdrop-blur-md border-t border-white/5 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[#00A3FF]/20 to-transparent" />
         <div className="flex justify-between items-center mb-6">
           <div className="flex flex-col">

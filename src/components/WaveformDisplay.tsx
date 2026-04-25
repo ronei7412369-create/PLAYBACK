@@ -44,7 +44,7 @@ export const WaveformDisplay: React.FC = () => {
   const renderPeaks = currentSong.waveformPeaks || Array.from({ length: 120 }).map(() => 0);
 
   return (
-    <div className="h-48 md:h-56 bg-[#050506] relative overflow-hidden border-b border-white/5 group flex-shrink-0">
+    <div className="h-48 md:h-56 bg-[#050505]/40 backdrop-blur-md relative overflow-hidden border-b border-white/5 group flex-shrink-0">
       {/* Background Grid */}
       <div className="absolute inset-0 opacity-10 pointer-events-none" 
         style={{ 

@@ -5,7 +5,7 @@ import { cn } from '../lib/utils';
 import { FileMusic, Search, Edit3, Save, X, Trash2 } from 'lucide-react';
 
 export const PlayList: React.FC = () => {
-  const { setlist, currentSong, setCurrentSong, removeFromSetlist, updateSongMetadata, isLoadingSong } = usePlayerStore();
+  const { setlist, currentSong, setCurrentSong, removeFromSetlist, updateSongMetadata, isLoadingSong, preloadedSongIds, preloadingSongId } = usePlayerStore();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editArtist, setEditArtist] = useState('');
@@ -35,7 +35,7 @@ export const PlayList: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col flex-1 h-full bg-[#0A0A0B] overflow-hidden">
+    <div className="flex flex-col flex-1 h-full bg-transparent overflow-hidden">
       {isLoadingSong && (
          <div className="absolute inset-0 z-50 bg-black/60 flex items-center justify-center backdrop-blur-sm">
             <div className="flex flex-col items-center gap-2">
@@ -128,13 +128,19 @@ export const PlayList: React.FC = () => {
                   </div>
                 )}
 
-                {/* Active Indicator */}
-                {currentSong?.id === song.id && editingId !== song.id && (
-                  <motion.div 
-                    layoutId="activeIndicator"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-[#00A3FF] shadow-[0_0_10px_#00A3FF]"
-                  />
-                )}
+                {/* Active Indicator / Preload Status */}
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                  {currentSong?.id === song.id && editingId !== song.id ? (
+                    <motion.div 
+                      layoutId="activeIndicator"
+                      className="w-1.5 h-1.5 rounded-full bg-[#00A3FF] shadow-[0_0_10px_#00A3FF]"
+                    />
+                  ) : preloadingSongId === song.id ? (
+                    <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="w-3 h-3 border-2 border-white/20 border-t-[#00A3FF] rounded-full" title="Preloading in background..." />
+                  ) : preloadedSongIds.includes(song.id) ? (
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#2ECC71] shadow-[0_0_5px_#2ECC71]" title="Preloaded and ready" />
+                  ) : null}
+                </div>
               </motion.div>
             ))}
           </div>

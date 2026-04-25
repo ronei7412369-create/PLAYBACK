@@ -44,7 +44,7 @@ export const Header: React.FC = () => {
   }, [showEq]);
 
   return (
-    <header className="h-16 md:h-20 bg-[#0A0A0B]/95 backdrop-blur-2xl border-b border-white/5 flex items-center justify-between px-3 md:px-8 z-50 sticky top-0">
+    <header className="h-16 md:h-20 bg-[#0A0A0B]/60 backdrop-blur-md border-b border-white/5 flex items-center justify-between px-3 md:px-8 z-50 sticky top-0">
       <div className="flex items-center gap-2 md:gap-4 shrink-0 pr-4">
         
         {/* Mobile menu toggle */}

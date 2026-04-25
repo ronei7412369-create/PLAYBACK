@@ -18,10 +18,15 @@ export const signInWithGoogle = async () => {
     const userDoc = await getDoc(userRef);
     
     if (!userDoc.exists()) {
+      const trialEndsAtDate = new Date();
+      trialEndsAtDate.setDate(trialEndsAtDate.getDate() + 3);
+
       const data: any = {
         email: user.email,
         createdAt: serverTimestamp(),
-        lastLogin: serverTimestamp()
+        lastLogin: serverTimestamp(),
+        trialEndsAt: trialEndsAtDate,
+        isPaid: false
       };
       if (user.displayName) data.displayName = user.displayName;
       if (user.photoURL) data.photoURL = user.photoURL;
@@ -52,12 +57,17 @@ export const signInWithEmail = async (email: string, password: string) => {
     const userRef = doc(db, 'users', user.uid);
     const userDoc = await getDoc(userRef);
     
+    const trialEndsAtDate = new Date();
+    trialEndsAtDate.setDate(trialEndsAtDate.getDate() + 3);
+
     if (!userDoc.exists()) {
       await setDoc(userRef, {
         email: user.email,
         displayName: user.displayName || user.email?.split('@')[0] || 'User',
         createdAt: serverTimestamp(),
-        lastLogin: serverTimestamp()
+        lastLogin: serverTimestamp(),
+        trialEndsAt: trialEndsAtDate,
+        isPaid: false
       });
     } else {
       await setDoc(userRef, {
@@ -77,12 +87,17 @@ export const signUpWithEmail = async (email: string, password: string, displayNa
     const result = await createUserWithEmailAndPassword(auth, email, password);
     const user = result.user;
     
+    const trialEndsAtDate = new Date();
+    trialEndsAtDate.setDate(trialEndsAtDate.getDate() + 3);
+
     const userRef = doc(db, 'users', user.uid);
     await setDoc(userRef, {
       email: user.email,
       displayName: displayName || user.email?.split('@')[0],
       createdAt: serverTimestamp(),
-      lastLogin: serverTimestamp()
+      lastLogin: serverTimestamp(),
+      trialEndsAt: trialEndsAtDate,
+      isPaid: false
     });
     
     return user;
@@ -100,12 +115,17 @@ export const createInternalUserWithEmail = async (email: string, password: strin
     const result = await createUserWithEmailAndPassword(secondaryAuth, email, password);
     const user = result.user;
     
+    const trialEndsAtDate = new Date();
+    trialEndsAtDate.setDate(trialEndsAtDate.getDate() + 3);
+
     const userRef = doc(db, 'users', user.uid);
     await setDoc(userRef, {
       email: user.email,
       displayName: displayName || user.email?.split('@')[0],
       createdAt: serverTimestamp(),
-      lastLogin: serverTimestamp()
+      lastLogin: serverTimestamp(),
+      trialEndsAt: trialEndsAtDate,
+      isPaid: false
     });
     
     await fbSignOut(secondaryAuth);

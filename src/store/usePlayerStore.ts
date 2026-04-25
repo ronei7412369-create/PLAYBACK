@@ -3,21 +3,48 @@ import { PlayerState, Song } from '../types';
 import { audioEngine } from '../services/audioEngine';
 import { storageEngine } from '../services/storageEngine';
 
-import { auth, signInWithGoogle, signOut, signInWithEmail, signUpWithEmail, createInternalUserWithEmail } from '../services/firebase';
+import { auth, signInWithGoogle, signOut, signInWithEmail, signUpWithEmail, createInternalUserWithEmail, db } from '../services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 
 let lastTaps: number[] = [];
 
-export const usePlayerStore = create<PlayerState>((set, get) => {
+export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set, get) => {
   // Listen to Firebase auth state
-  onAuthStateChanged(auth, (user) => {
-    const adminEmails = ["rudson.p48@icloud.com", "rudson.p48@gmail.com", "rudson.p48@iclou.com"];
+  onAuthStateChanged(auth, async (user) => {
+    const adminEmails = ["rudson.p48@icloud.com", "rudson.p48@gmail.com", "rudson.p48@iclou.com", "ronei7412369@gmail.com"];
     const isAdmin = user ? adminEmails.includes(user.email || "") : false;
-    set({ isAuthenticated: !!user, user, isAdmin });
+    let hasAccess = false;
+
+    if (user) {
+      if (isAdmin) {
+        hasAccess = true;
+      } else {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            if (data.isPaid) {
+              hasAccess = true;
+            } else if (data.trialEndsAt) {
+              const trialEnd = data.trialEndsAt.toDate();
+              if (new Date() < trialEnd) {
+                hasAccess = true;
+              }
+            }
+          }
+        } catch (err) {
+          console.error("Error fetching user access data", err);
+        }
+      }
+    }
+
+    set({ isAuthenticated: !!user, user, isAdmin, hasAccess });
   });
 
   return {
   isAuthenticated: false,
+  hasAccess: false,
   isAdmin: false,
   user: null,
   isStageMode: false,

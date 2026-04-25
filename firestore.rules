@@ -9,6 +9,9 @@ service cloud.firestore {
 
     // --- PRIMITIVES & VALIDATION HELPERS ---
     function isSignedIn() { return request.auth != null; }
+    function isAdmin() { 
+      return isSignedIn() && request.auth.token.email in ["rudson.p48@icloud.com", "rudson.p48@gmail.com", "rudson.p48@iclou.com", "ronei7412369@gmail.com"]; 
+    }
     function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
@@ -19,28 +22,31 @@ service cloud.firestore {
         && data.createdAt == request.time
         && (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 100))
         && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 500))
-        && (!('lastLogin' in data) || (data.lastLogin == request.time));
+        && (!('lastLogin' in data) || (data.lastLogin == request.time))
+        && (!('isPaid' in data) || data.isPaid is bool)
+        && (!('trialEndsAt' in data) || data.trialEndsAt is timestamp);
     }
 
     function isValidUserUpdate(data) {
       return (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 100))
         && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 500))
-        && (!('lastLogin' in data) || (data.lastLogin == request.time));
+        && (!('lastLogin' in data) || (data.lastLogin == request.time))
+        && (!('isPaid' in data) || data.isPaid is bool)
+        && (!('trialEndsAt' in data) || data.trialEndsAt is timestamp);
     }
 
     // --- USERS COLLECTION ---
     match /users/{userId} {
-      // Owner only read
-      allow read: if isSignedIn() && request.auth.uid == userId;
+      // Admin read all, or Owner read self
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
       
-      // Owner create
-      allow create: if isSignedIn() 
-        && request.auth.uid == userId 
+      // Admin create all, or Owner self
+      allow create: if (isAdmin() || (isSignedIn() && request.auth.uid == userId)) 
         && isValidId(userId)
         && isValidUserCreate(incoming());
         
-      // Owner update
-      allow update: if (
+      // Admin update all, or Owner update self
+      allow update: if isAdmin() || (
         isSignedIn()
         && request.auth.uid == userId
         && isValidUserUpdate(incoming())
