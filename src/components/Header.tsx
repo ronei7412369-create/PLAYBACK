@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { usePlayerStore } from '../store/usePlayerStore';
-import { Volume2, Settings, Clock, Hash, Key, ShieldCheck, Headphones, MonitorPlay, LogOut, Menu, SlidersHorizontal, X, Users } from 'lucide-react';
+import { Volume2, Settings, Clock, Hash, Key, ShieldCheck, Headphones, MonitorPlay, LogOut, Menu, SlidersHorizontal, X, Users, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { AdminModal } from './AdminModal';
@@ -9,7 +9,27 @@ export const Header: React.FC = () => {
   const { currentSong, masterVolume, setMasterVolume, masterEq, setMasterEQ, isPlaying, toggleMetronome, metronomeEnabled, isLRSplit, toggleLRSplit, isStageMode, toggleStageMode, logout, isSidebarOpen, setShowSidebar, tapTempo, cycleTimeSignature, pitchShift, setPitchShift, isAdmin } = usePlayerStore();
   const [showEq, setShowEq] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const eqRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -51,6 +71,17 @@ export const Header: React.FC = () => {
       </div>
 
       <div className="flex items-center gap-2 md:gap-8 shrink-0">
+        {deferredPrompt && (
+          <button
+            onClick={handleInstallClick}
+            className="flex items-center gap-1.5 md:gap-2 bg-[#00A3FF]/10 text-[#00A3FF] hover:bg-[#00A3FF]/20 px-2.5 py-1.5 md:px-4 md:py-1.5 rounded-full text-[10px] md:text-xs font-bold transition-colors border border-[#00A3FF]/30"
+          >
+            <Download size={14} className="w-3 h-3 md:w-3.5 md:h-3.5" />
+            <span className="hidden sm:inline">Instalar App</span>
+            <span className="inline sm:hidden">Instalar</span>
+          </button>
+        )}
+
         <motion.div 
           animate={{ scale: isPlaying ? [1, 1.05, 1] : 1 }}
           transition={{ repeat: Infinity, duration: 2 }}

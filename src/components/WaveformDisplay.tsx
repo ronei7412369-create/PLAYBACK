@@ -126,7 +126,7 @@ export const WaveformDisplay: React.FC = () => {
             {Math.floor(currentTime / 60)}:{(Math.floor(currentTime) % 60).toString().padStart(2, '0')}
           </span>
           <span className="text-white/20 font-black text-xs md:text-sm tracking-widest uppercase hidden md:inline">
-            / {Math.floor(currentSong.duration / 60)}:{(currentSong.duration % 60).toString().padStart(2, '0')}
+            / {Math.floor(currentSong.duration / 60)}:{Math.floor(currentSong.duration % 60).toString().padStart(2, '0')}
           </span>
         </div>
 
