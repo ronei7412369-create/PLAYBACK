@@ -4,6 +4,9 @@ import * as Tone from 'tone';
 export class AudioEngine {
   private context: AudioContext;
   public masterGain: GainNode;
+  public masterEqLow: BiquadFilterNode;
+  public masterEqMid: BiquadFilterNode;
+  public masterEqHigh: BiquadFilterNode;
   private pitchShift: any; // using any for Tone node
   private stems: Map<string, { 
     buffer: AudioBuffer; 
@@ -53,9 +56,25 @@ export class AudioEngine {
     });
 
     this.masterGain = this.context.createGain();
+
+    this.masterEqLow = this.context.createBiquadFilter();
+    this.masterEqLow.type = 'lowshelf';
+    this.masterEqLow.frequency.value = 320;
+
+    this.masterEqMid = this.context.createBiquadFilter();
+    this.masterEqMid.type = 'peaking';
+    this.masterEqMid.frequency.value = 1000;
+    this.masterEqMid.Q.value = 0.5;
+
+    this.masterEqHigh = this.context.createBiquadFilter();
+    this.masterEqHigh.type = 'highshelf';
+    this.masterEqHigh.frequency.value = 3200;
     
-    // Connect Master -> PitchShift -> Destination
-    Tone.connect(this.masterGain, this.pitchShift);
+    // Connect Master -> EQ -> PitchShift -> Destination
+    this.masterGain.connect(this.masterEqLow);
+    this.masterEqLow.connect(this.masterEqMid);
+    this.masterEqMid.connect(this.masterEqHigh);
+    Tone.connect(this.masterEqHigh, this.pitchShift);
     Tone.connect(this.pitchShift, this.context.destination);
 
     this.clickGain = this.context.createGain();
@@ -365,6 +384,12 @@ export class AudioEngine {
 
   public setMasterVolume(volume: number) {
     this.masterGain.gain.setTargetAtTime(Math.max(0.001, volume), this.context.currentTime, 0.05);
+  }
+
+  public setMasterEQ(band: 'low' | 'mid' | 'high', value: number) {
+    if (band === 'low') this.masterEqLow.gain.setTargetAtTime(value, this.context.currentTime, 0.05);
+    if (band === 'mid') this.masterEqMid.gain.setTargetAtTime(value, this.context.currentTime, 0.05);
+    if (band === 'high') this.masterEqHigh.gain.setTargetAtTime(value, this.context.currentTime, 0.05);
   }
 
   public setStemVolume(id: string, volume: number) {

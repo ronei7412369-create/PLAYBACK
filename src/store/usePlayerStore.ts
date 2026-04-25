@@ -3,7 +3,7 @@ import { PlayerState, Song } from '../types';
 import { audioEngine } from '../services/audioEngine';
 import { storageEngine } from '../services/storageEngine';
 
-import { auth, signInWithGoogle, signOut } from '../services/firebase';
+import { auth, signInWithGoogle, signOut, signInWithEmail, signUpWithEmail, createInternalUserWithEmail } from '../services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
 let lastTaps: number[] = [];
@@ -11,11 +11,14 @@ let lastTaps: number[] = [];
 export const usePlayerStore = create<PlayerState>((set, get) => {
   // Listen to Firebase auth state
   onAuthStateChanged(auth, (user) => {
-    set({ isAuthenticated: !!user, user });
+    const adminEmails = ["rudson.p48@icloud.com", "rudson.p48@gmail.com", "rudson.p48@iclou.com"];
+    const isAdmin = user ? adminEmails.includes(user.email || "") : false;
+    set({ isAuthenticated: !!user, user, isAdmin });
   });
 
   return {
   isAuthenticated: false,
+  isAdmin: false,
   user: null,
   isStageMode: false,
   isLoadingSong: false,
@@ -29,6 +32,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
   isPlaying: false,
   currentTime: 0,
   masterVolume: 0.8,
+  masterEq: { low: 0, mid: 0, high: 0 },
   isLooping: false,
   isInfiniteLoop: false,
   isFadeOut: false,
@@ -208,6 +212,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     set({ masterVolume: volume });
   },
 
+  setMasterEQ: (band, value) => {
+    audioEngine.setMasterEQ(band, value);
+    set((state) => ({ masterEq: { ...state.masterEq, [band]: value } }));
+  },
+
   setPlaybackRate: (rate) => {
     audioEngine.setPlaybackRate(rate);
     set({ playbackRate: rate });
@@ -366,6 +375,30 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       await signInWithGoogle();
     } catch (e) {
       console.error("Login failed", e);
+    }
+  },
+  loginWithEmail: async (email, password) => {
+    try {
+      await signInWithEmail(email, password);
+    } catch (e) {
+      console.error("Login with Email failed", e);
+      throw e; // Maybe front end needs to catch it to show error
+    }
+  },
+  signUpWithEmail: async (email, password) => {
+    try {
+      await signUpWithEmail(email, password);
+    } catch (e) {
+      console.error("Sign up failed", e);
+      throw e;
+    }
+  },
+  createInternalUser: async (email, password, displayName) => {
+    try {
+      await createInternalUserWithEmail(email, password, displayName);
+    } catch (e) {
+      console.error("Create internal user failed", e);
+      throw e;
     }
   },
   logout: async () => {

@@ -41,6 +41,7 @@ export interface Song {
 export interface PlayerState {
   // App State
   isAuthenticated: boolean;
+  isAdmin: boolean;
   user: any | null; // Firebase user
   isStageMode: boolean;
   isLoadingSong: boolean;
@@ -52,6 +53,7 @@ export interface PlayerState {
   isPlaying: boolean;
   currentTime: number;
   masterVolume: number;
+  masterEq: { low: number; mid: number; high: number };
   isLooping: boolean;
   isInfiniteLoop: boolean;
   isFadeOut: boolean;
@@ -70,6 +72,9 @@ export interface PlayerState {
 
   // Actions
   login: () => void;
+  loginWithEmail?: (e: string, p: string) => Promise<void>;
+  signUpWithEmail?: (e: string, p: string) => Promise<void>;
+  createInternalUser?: (e: string, p: string, d?: string) => Promise<void>;
   logout: () => void;
   toggleStageMode: () => void;
   setShowSidebar: (show: boolean) => void;
@@ -91,6 +96,7 @@ export interface PlayerState {
   stop: () => void;
   seek: (time: number) => void;
   setMasterVolume: (volume: number) => void;
+  setMasterEQ: (band: 'low' | 'mid' | 'high', value: number) => void;
   setPlaybackRate: (rate: number) => void;
   setPitchShift: (semitones: number) => void;
   toggleMetronome: () => void;
