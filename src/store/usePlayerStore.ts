@@ -104,6 +104,27 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
     audioEngine.setPlaybackRate(1.0);
   },
 
+  addProcessedSong: async (partialSong) => {
+    const fullSong: Song = {
+      ...partialSong,
+      duration: 0, // We could try to read duration but 0 is fine until decoded
+      bpm: 120,
+      key: 'C',
+      timeSignature: '4/4',
+      markers: [],
+    };
+
+    set((state) => ({ 
+      setlist: [...state.setlist, fullSong],
+      currentSong: fullSong,
+      currentTime: 0,
+      isPlaying: false,
+      playbackRate: 1.0
+    }));
+
+    audioEngine.setPlaybackRate(1.0);
+  },
+
   setCurrentSong: async (song) => {
     audioEngine.pause();
     const currentSongInState = get().currentSong;

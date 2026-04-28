@@ -89,6 +89,7 @@ export interface PlayerState {
   loadCustomPads: () => Promise<void>;
 
   importSong: (song: Song, buffers?: {id:string, buffer:ArrayBuffer}[]) => void;
+  addProcessedSong: (song: Omit<Song, 'duration' | 'bpm' | 'key' | 'timeSignature' | 'markers'>) => void;
   setCurrentSong: (song: Song) => Promise<void>;
   preloadSong: (songId: string) => Promise<void>;
   updatePeaks?: (peaks: number[]) => void;
