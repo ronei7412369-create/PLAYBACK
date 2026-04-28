@@ -162,10 +162,10 @@ export const BackgroundAnimation: React.FC = () => {
     };
 
   }, []);
+
   return (
     <>
       <div className="fixed inset-0 crt-scanlines pointer-events-none z-10 opacity-20"></div>
-
       <div className="fixed top-0 left-0 w-full h-full -z-10 bg-[#050505]">
         <canvas 
           ref={canvasRef} 
@@ -175,5 +175,3 @@ export const BackgroundAnimation: React.FC = () => {
     </>
   );
 };
-
-

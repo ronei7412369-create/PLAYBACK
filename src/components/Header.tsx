@@ -4,9 +4,10 @@ import { Volume2, Settings, Clock, Hash, Key, ShieldCheck, Headphones, MonitorPl
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { AdminModal } from './AdminModal';
+import { StemSplitter } from './StemSplitter';
 
 export const Header: React.FC = () => {
-  const { currentSong, masterVolume, setMasterVolume, masterEq, setMasterEQ, isPlaying, toggleMetronome, metronomeEnabled, isLRSplit, toggleLRSplit, isStageMode, toggleStageMode, logout, isSidebarOpen, setShowSidebar, tapTempo, cycleTimeSignature, pitchShift, setPitchShift, isAdmin } = usePlayerStore();
+  const { currentSong, masterVolume, setMasterVolume, masterEq, setMasterEQ, isPlaying, toggleMetronome, metronomeEnabled, isLRSplit, toggleLRSplit, isStageMode, toggleStageMode, logout, isSidebarOpen, setShowSidebar, tapTempo, updateBpm, cycleTimeSignature, pitchShift, setPitchShift, isAdmin } = usePlayerStore();
   const [showEq, setShowEq] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -68,6 +69,11 @@ export const Header: React.FC = () => {
             <span className="text-white font-black text-sm md:text-xl tracking-tighter">GIG PLAY</span>
           </div>
         </motion.div>
+        
+        {/* Yellow Box equivalent: Stem Splitter */}
+        <div className="hidden lg:block ml-4">
+           <StemSplitter />
+        </div>
       </div>
 
       <div className="flex items-center gap-2 md:gap-8 shrink-0">
@@ -94,20 +100,32 @@ export const Header: React.FC = () => {
         {/* Unified Controls Container */}
         <div className="flex items-center bg-[#111112] p-1.5 rounded-2xl border border-white/5 shadow-inner mr-2 md:mr-0">
           
-          <button 
-            onClick={toggleMetronome}
-            disabled={!currentSong}
-            className={cn(
-              "flex flex-col items-center justify-center px-3 py-1.5 rounded-xl transition-all disabled:opacity-50 min-w-[50px] relative overflow-hidden",
-              metronomeEnabled 
-                ? "bg-[#00A3FF]/10 text-[#00A3FF]" 
-                : "text-white/40 hover:bg-white/5 hover:text-white"
-            )}
-          >
-            {metronomeEnabled && <div className="absolute inset-0 bg-[#00A3FF]/20 animate-pulse" />}
-            <Clock size={12} className={cn("mb-0.5", metronomeEnabled ? "text-[#00A3FF]" : "")} />
-            <span className="font-black text-xs md:text-sm">{currentSong?.bpm || "120"}</span>
-          </button>
+          <div className="flex items-center gap-1">
+             <button 
+               onClick={tapTempo}
+               disabled={!currentSong}
+               className="hidden sm:block text-[9px] font-black uppercase tracking-widest text-white/50 hover:text-white bg-white/5 hover:bg-white/10 px-2 py-2.5 rounded-lg transition-colors border border-white/5 h-full"
+               title="Tap Tempo"
+             >
+               TAP
+             </button>
+             <div className={cn(
+               "flex flex-col items-center justify-center px-2 border border-transparent py-1 rounded-xl transition-all min-w-[70px] relative overflow-hidden",
+               metronomeEnabled 
+                 ? "bg-[#00A3FF]/10 border-[#00A3FF]/20" 
+                 : "hover:bg-white/5"
+             )}>
+                {metronomeEnabled && <div className="absolute inset-0 bg-[#00A3FF]/10 animate-pulse" />}
+                <button onClick={toggleMetronome} disabled={!currentSong} className={cn("flex items-center justify-center mb-0.5", metronomeEnabled ? "text-[#00A3FF]" : "text-white/40 hover:text-white")}>
+                  <Clock size={12} />
+                </button>
+                <div className="flex items-center justify-between w-full h-[18px] gap-1 z-10">
+                   <button onClick={() => updateBpm(-1)} disabled={!currentSong} className="text-white/40 hover:text-white font-black text-xs px-1 leading-none">-</button>
+                   <span className={cn("font-black text-xs md:text-sm tabular-nums tracking-tighter w-8 text-center", metronomeEnabled ? "text-[#00A3FF]" : "text-white")}>{currentSong?.bpm || "120"}</span>
+                   <button onClick={() => updateBpm(1)} disabled={!currentSong} className="text-white/40 hover:text-white font-black text-xs px-1 leading-none">+</button>
+                </div>
+             </div>
+          </div>
           
           <div className="w-[1px] h-6 bg-white/10 mx-1" />
 

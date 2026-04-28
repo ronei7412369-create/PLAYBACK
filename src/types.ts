@@ -104,6 +104,7 @@ export interface PlayerState {
   toggleLRSplit: () => void;
   
   tapTempo: () => void;
+  updateBpm: (delta: number) => void;
   cycleTimeSignature: () => void;
   
   toggleLoop: () => void;

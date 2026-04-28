@@ -254,15 +254,6 @@ export default function App() {
                    >
                      <Grid size={16} /> Pads
                    </button>
-                   <button 
-                     onClick={() => setMobileView('split')}
-                     className={cn(
-                       "flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold transition-all whitespace-nowrap",
-                       mobileView === 'split' ? "bg-indigo-500 text-white" : "bg-white/5 text-white/50"
-                     )}
-                   >
-                     <Music size={16} /> IA Split
-                   </button>
                  </div>
 
                  <div className={cn(
@@ -277,7 +268,7 @@ export default function App() {
                  <div className={cn(
                    "flex-1 flex flex-col sm:flex-row gap-4 px-4 pb-4 sm:bg-[#050506]/50 min-h-0",
                    "sm:overflow-hidden overflow-y-auto",
-                   (mobileView !== 'teleprompter' && mobileView !== 'pads' && mobileView !== 'split') && "hidden sm:flex" 
+                   (mobileView !== 'teleprompter' && mobileView !== 'pads') && "hidden sm:flex" 
                  )}>
                     {/* Teleprompter */}
                     <div className={cn(
@@ -297,16 +288,6 @@ export default function App() {
                       mobileView !== 'pads' && "hidden sm:block"
                     )}>
                        <PadsPlayer />
-                    </div>
-
-                    {/* AI Split */}
-                    <div className={cn(
-                      "flex-none w-full sm:w-[500px] rounded-xl bg-[#0A0A0B] border border-white/5 overflow-hidden",
-                      "min-h-[600px] sm:min-h-0 sm:h-full",
-                      "sm:block",
-                      mobileView !== 'split' && "hidden sm:block"
-                    )}>
-                       <StemSplitter />
                     </div>
                  </div>
                </>

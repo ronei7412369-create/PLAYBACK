@@ -282,6 +282,22 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
     set({ metronomeEnabled: newState });
   },
 
+  updateBpm: (delta: number) => {
+    const { currentSong, setlist } = get();
+    if (!currentSong) return;
+
+    const newBpm = Math.max(30, Math.min(currentSong.bpm + delta, 300));
+    const timeSig = currentSong.timeSignature || "4/4";
+    
+    audioEngine.updateMetronomeParams(newBpm, timeSig);
+    
+    const updatedSong = { ...currentSong, bpm: newBpm };
+    const newSetlist = setlist.map(s => s.id === updatedSong.id ? updatedSong : s);
+    storageEngine.saveSong(updatedSong, []);
+    
+    set({ currentSong: updatedSong, setlist: newSetlist });
+  },
+
   tapTempo: () => {
     const now = performance.now();
     

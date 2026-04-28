@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import * as ort from 'onnxruntime-web';
 import { DemucsProcessor, CONSTANTS } from 'demucs-web';
-import { Mic, Upload, FileAudio, Loader, Play, Music, Settings, Hash, SkipForward } from 'lucide-react';
+import { Music, Loader, UploadCloud } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { usePlayerStore } from '../store/usePlayerStore';
@@ -20,11 +20,11 @@ export const StemSplitter: React.FC = () => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       setFile(selectedFile);
+      processAudio(selectedFile);
     }
   };
 
-  const processAudio = async () => {
-    if (!file) return;
+  const processAudio = async (selectedFile: File) => {
     setIsProcessing(true);
     setStatus('Initializing AI...');
     setProgress(0);
@@ -34,7 +34,7 @@ export const StemSplitter: React.FC = () => {
       const audioContext = new AudioContext({ sampleRate: CONSTANTS.SAMPLE_RATE });
       
       setStatus('Decoding audio...');
-      const arrayBuffer = await file.arrayBuffer();
+      const arrayBuffer = await selectedFile.arrayBuffer();
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
       
       const leftChannel = audioBuffer.getChannelData(0);
@@ -51,7 +51,7 @@ export const StemSplitter: React.FC = () => {
             ort.env.webgpu = { powerPreference: 'high-performance' };
           }
         } catch (e) {
-          console.log('WebGPU not available, falling back to WASM');
+          console.log('WebGPU not available');
         }
       }
 
@@ -59,18 +59,14 @@ export const StemSplitter: React.FC = () => {
         ort,
         onProgress: (p) => {
           setProgress(p.progress * 100);
-          setStatus(`Processing: ${Math.round(p.progress * 100)}% (Segment ${p.currentSegment}/${p.totalSegments})`);
+          setStatus(`Processing: ${Math.round(p.progress * 100)}%`);
         },
         onLog: (phase, msg) => {
-          console.log(`[${phase}] ${msg}`);
           if(phase === 'Download') {
-            setStatus('Downloading AI model...');
+            setStatus('Downloading model...');
           }
         },
         onDownloadProgress: (loaded, total) => {
-          const loadedMB = (loaded / 1024 / 1024).toFixed(1);
-          const totalMB = (total / 1024 / 1024).toFixed(1);
-          setStatus(`Downloading AI model: ${loadedMB}MB / ${totalMB}MB`);
           setDownloadProgress((loaded / total) * 100);
         }
       });
@@ -78,10 +74,10 @@ export const StemSplitter: React.FC = () => {
       setStatus('Loading model...');
       await processor.loadModel(CONSTANTS.DEFAULT_MODEL_URL);
 
-      setStatus('AI Processing Audio (this may take a while)...');
+      setStatus('Splitting stems...');
       const result = await processor.separate(leftChannel, rightChannel);
 
-      setStatus('Creating tracks...');
+      setStatus('Saving tracks...');
       
       const createWavUrl = (left: Float32Array, right: Float32Array) => {
         const numChannels = 2;
@@ -132,7 +128,7 @@ export const StemSplitter: React.FC = () => {
       
       addProcessedSong({
         id: songId,
-        title: file.name.replace(/\.[^/.]+$/, ""),
+        title: selectedFile.name.replace(/\.[^/.]+$/, ""),
         artist: 'AI Processed',
         stems: [
           { id: `${songId}-vocals`, name: 'Vocals', file: vocalsUrl, output: 3, pan: 0, volume: 1, isMuted: false, isSoloed: false },
@@ -143,110 +139,67 @@ export const StemSplitter: React.FC = () => {
       });
 
       setStatus('Finished!');
-      setFile(null);
+      setTimeout(() => {
+        setIsProcessing(false);
+        setFile(null);
+      }, 2000);
     } catch (e: any) {
       console.error(e);
       setStatus(`Error: ${e.message || String(e)}`);
-    } finally {
-      setIsProcessing(false);
+      setTimeout(() => setIsProcessing(false), 3000);
     }
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#0A0A0B]/60 backdrop-blur-md p-6 overflow-y-auto custom-scrollbar relative">
-      <div className="absolute inset-0 bg-gradient-to-br from-[#00A3FF]/5 to-transparent pointer-events-none" />
+    <div className="flex items-center">
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        className="hidden" 
+        accept="audio/*" 
+        onChange={handleFileChange}
+      />
       
-      <div className="max-w-2xl mx-auto w-full relative z-10 flex flex-col gap-6">
-        
-        <div className="text-center mb-4">
-          <h2 className="text-3xl font-black mb-2 tracking-tight text-white">AI Stem Splitter</h2>
-          <p className="text-white/60">Upload track and separate it into Vocals, Drums, Bass, and Instruments using AI directly in your browser. No server required!</p>
-        </div>
-
-        <div 
-          onClick={() => !isProcessing && fileInputRef.current?.click()}
-          className={cn(
-            "border-2 border-dashed rounded-3xl p-12 flex flex-col items-center justify-center cursor-pointer transition-all duration-300",
-            file ? "border-[#00A3FF]/50 bg-[#00A3FF]/5" : "border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20",
-            isProcessing && "opacity-50 pointer-events-none"
-          )}
-        >
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            className="hidden" 
-            accept="audio/*" 
-            onChange={handleFileChange}
-          />
-          
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#00A3FF] to-[#0066FF] flex items-center justify-center shadow-[0_0_30px_rgba(0,163,255,0.3)] mb-6">
-            <Music size={32} className="text-white" />
-          </div>
-          
-          <h3 className="text-xl font-bold text-white mb-2">
-            {file ? file.name : "Select an Audio File"}
-          </h3>
-          <p className="text-white/50 text-sm">
-            {file ? "Click to change file" : "MP3, WAV, FLAC"}
-          </p>
-        </div>
-
-        {file && !isProcessing && (
-          <button 
-            onClick={processAudio}
-            className="w-full py-4 rounded-2xl bg-white text-black font-black text-lg hover:bg-zinc-200 transition-all hover:scale-[1.02] shadow-[0_0_20px_rgba(255,255,255,0.1)]"
+      <AnimatePresence mode="wait">
+        {!isProcessing ? (
+          <motion.button
+            key="button"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-2 bg-[#00A3FF]/10 hover:bg-[#00A3FF]/20 text-[#00A3FF] border border-[#00A3FF]/20 px-4 py-2 rounded-xl transition-all font-bold text-sm h-10 w-[240px] justify-center"
           >
-            Start Split
-          </button>
+            <UploadCloud size={16} />
+            <span>AI Stem Splitter</span>
+          </motion.button>
+        ) : (
+          <motion.div
+            key="progress"
+            initial={{ opacity: 0, width: 0 }}
+            animate={{ opacity: 1, width: '240px' }}
+            exit={{ opacity: 0 }}
+            className="flex flex-col justify-center bg-[#050505] border border-[#00A3FF]/30 px-3 py-1.5 rounded-xl h-10 overflow-hidden relative shadow-[0_0_15px_rgba(0,163,255,0.1)]"
+          >
+             <div className="flex items-center justify-between gap-2 z-10 relative mb-1">
+               <div className="flex items-center gap-1.5 text-xs font-bold text-[#00A3FF] truncate">
+                 <Loader size={12} className="animate-spin shrink-0" />
+                 <span className="truncate">{status}</span>
+               </div>
+               <span className="text-[10px] font-mono font-black text-white/70 tabular-nums">
+                 {Math.round(progress > 0 ? progress : downloadProgress)}%
+               </span>
+             </div>
+             <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden shrink-0">
+               <motion.div 
+                 className="h-full bg-gradient-to-r from-[#00A3FF] to-[#0066FF]"
+                 style={{ width: `${progress > 0 ? progress : downloadProgress}%` }}
+                 transition={{ duration: 0.2 }}
+               />
+             </div>
+          </motion.div>
         )}
-
-        <AnimatePresence>
-          {isProcessing && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="bg-[#050505]/80 border border-white/10 rounded-3xl p-6 overflow-hidden relative"
-            >
-              <div className="flex flex-col gap-4 relative z-10">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Loader size={20} className="text-[#00A3FF] animate-spin" />
-                    <span className="font-bold text-white">{status}</span>
-                  </div>
-                  <span className="text-[#00A3FF] font-mono font-bold">
-                    {Math.round(progress > 0 ? progress : downloadProgress)}%
-                  </span>
-                </div>
-                
-                <div className="flex flex-col gap-2">
-                   {downloadProgress > 0 && downloadProgress < 100 && (
-                      <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
-                        <motion.div 
-                          className="h-full bg-white/40"
-                          style={{ width: `${downloadProgress}%` }}
-                          transition={{ duration: 0.2 }}
-                        />
-                      </div>
-                   )}
-                   <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden">
-                     <motion.div 
-                       className="h-full bg-gradient-to-r from-[#00A3FF] to-[#0066FF]"
-                       style={{ width: `${progress}%` }}
-                       transition={{ duration: 0.2 }}
-                     />
-                   </div>
-                </div>
-
-                <p className="text-xs text-white/40 leading-relaxed">
-                  The model executes entirely on your device via WebAssembly <br/>
-                  (It'll download a 170MB ONNX model on the first run).
-                </p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+      </AnimatePresence>
     </div>
   );
 };
