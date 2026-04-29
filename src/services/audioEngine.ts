@@ -435,6 +435,7 @@ export class AudioEngine {
   }
 
   public setStemEQ(id: string, band: 'low' | 'mid' | 'high', value: number) {
+    if (Number.isNaN(value) || value === undefined) return;
     const stem = this.stems.get(id);
     if (stem) {
       if (band === 'low') stem.eqLow.gain.setTargetAtTime(value, this.context.currentTime, 0.05);

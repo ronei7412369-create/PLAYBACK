@@ -159,22 +159,21 @@ const TrackDetailsModal: React.FC<{ stem: Stem, index: number, onClose: () => vo
   const trackColor = TRACK_COLORS[index % TRACK_COLORS.length];
 
   return createPortal(
-    <AnimatePresence>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:p-4"
+      onClick={onClose}
+    >
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:p-4"
-        onClick={onClose}
+        initial={{ y: "100%" }}
+        animate={{ y: 0 }}
+        exit={{ y: "100%" }}
+        transition={{ type: "spring", damping: 25, stiffness: 300 }}
+        className="w-full sm:w-[500px] max-w-full bg-[#111112] border-t sm:border border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
       >
-        <motion.div
-          initial={{ y: "100%" }}
-          animate={{ y: 0 }}
-          exit={{ y: "100%" }}
-          transition={{ type: "spring", damping: 25, stiffness: 300 }}
-          className="w-full sm:w-[500px] max-w-full bg-[#111112] border-t sm:border border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden"
-          onClick={(e) => e.stopPropagation()}
-        >
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-white/5 bg-gradient-to-b from-white/5 to-transparent">
             <div className="flex items-center gap-3">
@@ -320,8 +319,7 @@ const TrackDetailsModal: React.FC<{ stem: Stem, index: number, onClose: () => vo
 
           </div>
         </motion.div>
-      </motion.div>
-    </AnimatePresence>,
+      </motion.div>,
     document.body
   );
 };
@@ -349,13 +347,16 @@ export const Mixer: React.FC = () => {
       ))}
       <div className="min-w-[40px]" />
 
-      {selectedStem && (
-         <TrackDetailsModal 
-           stem={selectedStem} 
-           index={currentSong.stems.findIndex(s => s.id === selectedStem.id)}
-           onClose={() => setSelectedTrackId(null)} 
-         />
-      )}
+      <AnimatePresence>
+        {selectedStem && (
+           <TrackDetailsModal 
+             key="track-details-modal"
+             stem={selectedStem} 
+             index={currentSong.stems.findIndex(s => s.id === selectedStem.id)}
+             onClose={() => setSelectedTrackId(null)} 
+           />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

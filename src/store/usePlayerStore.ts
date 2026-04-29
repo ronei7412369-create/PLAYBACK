@@ -114,7 +114,7 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
       markers: [],
     };
 
-    const buffers: { stemId: string; buffer: ArrayBuffer }[] = [];
+    const buffers: { id: string; buffer: ArrayBuffer }[] = [];
     if (fullSong.stems) {
       for (const stem of fullSong.stems) {
          if (stem.originalFile) {
@@ -515,7 +515,7 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
       currentSong: state.currentSong ? {
         ...state.currentSong,
         stems: state.currentSong.stems.map(s => 
-          s.id === stemId ? { ...s, eq: { ...s.eq, [band]: value } } : s
+          s.id === stemId ? { ...s, eq: { ...(s.eq || { low: 0, mid: 0, high: 0 }), [band]: value } } : s
         )
       } : null
     }));

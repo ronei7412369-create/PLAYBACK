@@ -46,8 +46,10 @@ export default function App() {
           // @ts-ignore
           wakeLock = await navigator.wakeLock.request('screen');
         }
-      } catch (err) {
-        console.error('Wake Lock error:', err);
+      } catch (err: any) {
+        if (err.name !== 'NotAllowedError') {
+          console.warn('Wake Lock warning:', err);
+        }
       }
     };
 
