@@ -123,22 +123,46 @@ export class AudioEngine {
 
     const filter = this.context.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.value = 600;
-    filter.Q.value = 0.5;
+    filter.frequency.value = 800; // slightly brighter
+    filter.Q.value = 1.0;
 
+    // Movement on the filter
+    const filterLfo = this.context.createOscillator();
+    filterLfo.type = 'sine';
+    filterLfo.frequency.value = 0.1; // Very slow sweep
+    const filterGain = this.context.createGain();
+    filterGain.gain.value = 300;
+    filterLfo.connect(filterGain);
+    filterGain.connect(filter.frequency);
+    filterLfo.start();
+    this.padOscillators.push(filterLfo);
+
+    // Add a simple delay for a lush "reverb" effect
+    const delay = this.context.createDelay();
+    delay.delayTime.value = 0.5; // 500ms
+    const feedback = this.context.createGain();
+    feedback.gain.value = 0.6; // 60% feedback
+    
     // Smooth envelope attack
     this.padGain.gain.cancelScheduledValues(this.context.currentTime);
     this.padGain.gain.setValueAtTime(0, this.context.currentTime);
-    this.padGain.gain.linearRampToValueAtTime(masterVolume, this.context.currentTime + 1.5);
+    this.padGain.gain.linearRampToValueAtTime(masterVolume, this.context.currentTime + 2.0);
 
+    // Routing
     filter.connect(this.padGain);
+    
+    // Delay routing
+    filter.connect(delay);
+    delay.connect(feedback);
+    feedback.connect(delay);
+    delay.connect(this.padGain);
 
     // Create a thick pad with root, 5th, and octave
-    const freqs = [frequency / 2, frequency, frequency * 1.5];
+    const freqs = [frequency / 2, frequency, frequency * 1.498]; // Perfect fifth is ~1.498
 
     freqs.forEach(f => {
-      // Detuned pair for each oscillator
-      [-3, 0, 3].forEach(detune => {
+      // Multiple detuned oscillators
+      [-6, -3, 0, 3, 6].forEach(detune => {
          const osc = this.context.createOscillator();
          osc.type = 'sawtooth';
          osc.frequency.value = f;
@@ -147,14 +171,18 @@ export class AudioEngine {
          // Gentle LFO for movement
          const lfo = this.context.createOscillator();
          lfo.type = 'sine';
-         lfo.frequency.value = 0.4 + Math.random() * 0.2;
+         lfo.frequency.value = 0.2 + Math.random() * 0.3;
          const lfoGain = this.context.createGain();
-         lfoGain.gain.value = 6;
+         lfoGain.gain.value = 10;
          lfo.connect(lfoGain);
          lfoGain.connect(osc.detune);
          lfo.start();
 
-         osc.connect(filter);
+         const oscGain = this.context.createGain();
+         oscGain.gain.value = 0.2; // reduce volume due to many oscillators
+         osc.connect(oscGain);
+         oscGain.connect(filter);
+         
          osc.start();
          this.padOscillators.push(osc);
          this.padOscillators.push(lfo);

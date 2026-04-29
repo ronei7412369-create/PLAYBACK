@@ -110,7 +110,7 @@ export default function App() {
       // but requestAnimationFrame is better than setInterval.
       if (timestamp - lastTime >= 50) { // ~20fps upate is enough for numbers, waveform is CSS
         const engTime = audioEngine.getCurrentTime();
-        if (currentSong && engTime >= currentSong.duration) {
+        if (currentSong && currentSong.duration > 0.1 && engTime >= currentSong.duration) {
           seek(0);
           stop(); // Or loop based on settings
         } else {

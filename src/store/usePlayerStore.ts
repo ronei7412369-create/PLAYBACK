@@ -114,15 +114,27 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
       markers: [],
     };
 
+    const buffers: { stemId: string; buffer: ArrayBuffer }[] = [];
+    if (fullSong.stems) {
+      for (const stem of fullSong.stems) {
+         if (stem.originalFile) {
+            const buf = await stem.originalFile.arrayBuffer();
+            buffers.push({ id: stem.id, buffer: buf });
+         }
+      }
+    }
+
+    try {
+      await storageEngine.saveSong(fullSong, buffers);
+    } catch (e) {
+      console.error("Failed to save processed song to DB", e);
+    }
+
     set((state) => ({ 
       setlist: [...state.setlist, fullSong],
-      currentSong: fullSong,
-      currentTime: 0,
-      isPlaying: false,
-      playbackRate: 1.0
     }));
 
-    audioEngine.setPlaybackRate(1.0);
+    await get().setCurrentSong(fullSong);
   },
 
   setCurrentSong: async (song) => {
@@ -165,6 +177,15 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
        });
 
        await Promise.all(loadPromises);
+       
+       const maxDuration = audioEngine.getDuration();
+       if (song.duration === 0 && maxDuration > 0) {
+          song.duration = maxDuration;
+          const { setlist } = get();
+          set({ setlist: setlist.map(s => s.id === song.id ? {...s, duration: maxDuration} : s) });
+          // Optionally save to DB again without stems just to update duration
+          storageEngine.saveSong({...song, duration: maxDuration}, []).catch(() => {});
+       }
        
        // Force eq re-application
        if (song.stems) {

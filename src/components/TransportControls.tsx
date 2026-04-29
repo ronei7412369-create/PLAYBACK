@@ -96,22 +96,22 @@ export const TransportControls: React.FC = () => {
       </div>
 
       {/* Main Playback Controls - Put this on top for mobile */}
-      <div className="flex items-center justify-center gap-6 md:gap-8 z-10 order-1 w-full md:w-auto">
+      <div className="flex items-center justify-center gap-6 md:gap-10 z-10 order-1 w-full md:w-auto">
         <motion.button 
-          whileHover={{ scale: 1.2, x: -5 }}
+          whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
-          className="p-2 md:p-4 text-white/40 hover:text-white transition-colors"
+          className="p-2 md:p-4 text-white/30 hover:text-white transition-colors"
         >
-          <SkipBack size={26} className="md:w-[28px] md:h-[28px]" fill="currentColor" />
+          <SkipBack size={32} className="md:w-[36px] md:h-[36px]" strokeWidth={1.5} />
         </motion.button>
 
         <motion.button 
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={stop}
-          className="p-4 md:p-5 bg-white/5 border border-white/5 md:border-white/10 rounded-2xl md:rounded-3xl text-white/60 hover:text-white hover:bg-white/10 transition-all shadow-lg"
+          className="w-16 h-16 md:w-20 md:h-20 bg-[#1A1A1C]/80 border border-white/5 rounded-[1.25rem] md:rounded-[1.75rem] text-white/40 hover:text-white hover:bg-[#252528] transition-all flex items-center justify-center"
         >
-          <Square size={22} className="md:w-[24px] md:h-[24px]" fill="currentColor" />
+          <Square size={24} className="md:w-[28px] md:h-[28px]" strokeWidth={2.5} fill="currentColor" />
         </motion.button>
 
         <motion.button 
@@ -120,27 +120,26 @@ export const TransportControls: React.FC = () => {
           whileTap={{ scale: 0.95 }}
           onClick={togglePlay}
           className={cn(
-            "p-5 md:p-6 rounded-[1.75rem] md:rounded-[2rem] transition-all shadow-2xl relative group focus:outline-none focus:ring-4 focus:ring-white/10",
+            "w-20 h-20 md:w-28 md:h-28 rounded-[1.5rem] md:rounded-[2.25rem] transition-all relative group focus:outline-none flex items-center justify-center",
             isPlaying 
-              ? "bg-gradient-to-br from-[#E74C3C] to-[#C0392B] text-white shadow-[#E74C3C]/30" 
-              : "bg-gradient-to-br from-[#2ECC71] to-[#27AE60] text-white shadow-[#2ECC71]/30"
+              ? "bg-[#FF3B30] text-white shadow-[0_0_30px_rgba(255,59,48,0.2)]" 
+              : "bg-[#34C759] text-white shadow-[0_0_30px_rgba(52,199,89,0.2)]"
           )}
-          style={{ width: '80px', height: '80px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
-          <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity rounded-[1.75rem] md:rounded-[2rem]" />
+          <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity rounded-[1.5rem] md:rounded-[2.25rem]" />
           {isPlaying ? (
-            <Pause size={28} className="md:w-[32px] md:h-[32px]" fill="currentColor" />
+            <Pause size={32} className="md:w-[40px] md:h-[40px]" strokeWidth={3} fill="currentColor" />
           ) : (
-            <Play size={28} className="md:w-[32px] md:h-[32px] ml-1.5 md:ml-2" fill="currentColor" />
+            <Play size={32} className="md:w-[40px] md:h-[40px] ml-1.5 md:ml-2.5" strokeWidth={3} fill="currentColor" />
           )}
         </motion.button>
 
         <motion.button 
-          whileHover={{ scale: 1.2, x: 5 }}
+          whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
-          className="p-2 md:p-4 text-white/40 hover:text-white transition-colors"
+          className="p-2 md:p-4 text-white/30 hover:text-white transition-colors"
         >
-          <SkipForward size={26} className="md:w-[28px] md:h-[28px]" fill="currentColor" />
+          <SkipForward size={32} className="md:w-[36px] md:h-[36px]" strokeWidth={1.5} />
         </motion.button>
       </div>
 

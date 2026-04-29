@@ -79,9 +79,9 @@ export const StemSplitter: React.FC = () => {
 
       setStatus('Saving tracks...');
       
-      const createWavUrl = (left: Float32Array, right: Float32Array) => {
+      const createWavData = (left: Float32Array, right: Float32Array, filename: string) => {
         const numChannels = 2;
-        const sampleRate = CONSTANTS.SAMPLE_RATE;
+        const sampleRate = CONSTANTS.SAMPLE_RATE || 44100;
         const length = left.length;
         const buffer = new ArrayBuffer(44 + length * numChannels * 2);
         const view = new DataView(buffer);
@@ -97,7 +97,7 @@ export const StemSplitter: React.FC = () => {
         writeString(8, 'WAVE');
         writeString(12, 'fmt ');
         view.setUint32(16, 16, true);
-        view.setUint16(20, 1, true);
+        view.setUint16(20, 1, true); // 1 = PCM
         view.setUint16(22, numChannels, true);
         view.setUint32(24, sampleRate, true);
         view.setUint32(28, sampleRate * numChannels * 2, true);
@@ -116,25 +116,30 @@ export const StemSplitter: React.FC = () => {
         }
 
         const blob = new Blob([buffer], { type: 'audio/wav' });
-        return URL.createObjectURL(blob);
+        const fileObj = new File([blob], filename, { type: 'audio/wav' });
+        return {
+           url: URL.createObjectURL(blob),
+           file: fileObj
+        };
       };
 
-      const drumsUrl = createWavUrl(result.drums.left, result.drums.right);
-      const bassUrl = createWavUrl(result.bass.left, result.bass.right);
-      const otherUrl = createWavUrl(result.other.left, result.other.right);
-      const vocalsUrl = createWavUrl(result.vocals.left, result.vocals.right);
-
       const songId = Math.random().toString(36).substring(7);
+
+      const drumsData = createWavData(result.drums.left, result.drums.right, 'drums.wav');
+      const bassData = createWavData(result.bass.left, result.bass.right, 'bass.wav');
+      const otherData = createWavData(result.other.left, result.other.right, 'other.wav');
+      const vocalsData = createWavData(result.vocals.left, result.vocals.right, 'vocals.wav');
+
       
       addProcessedSong({
         id: songId,
         title: selectedFile.name.replace(/\.[^/.]+$/, ""),
         artist: 'AI Processed',
         stems: [
-          { id: `${songId}-vocals`, name: 'Vocals', file: vocalsUrl, output: 3, pan: 0, volume: 1, isMuted: false, isSoloed: false },
-          { id: `${songId}-drums`, name: 'Drums', file: drumsUrl, output: 3, pan: 0, volume: 1, isMuted: false, isSoloed: false },
-          { id: `${songId}-bass`, name: 'Bass', file: bassUrl, output: 3, pan: 0, volume: 1, isMuted: false, isSoloed: false },
-          { id: `${songId}-other`, name: 'Instruments', file: otherUrl, output: 3, pan: 0, volume: 1, isMuted: false, isSoloed: false },
+          { id: `${songId}-vocals`, name: 'Vocals', file: vocalsData.url, originalFile: vocalsData.file, output: 3, pan: 0, volume: 1, isMuted: false, isSoloed: false },
+          { id: `${songId}-drums`, name: 'Drums', file: drumsData.url, originalFile: drumsData.file, output: 3, pan: 0, volume: 1, isMuted: false, isSoloed: false },
+          { id: `${songId}-bass`, name: 'Bass', file: bassData.url, originalFile: bassData.file, output: 3, pan: 0, volume: 1, isMuted: false, isSoloed: false },
+          { id: `${songId}-other`, name: 'Instruments', file: otherData.url, originalFile: otherData.file, output: 3, pan: 0, volume: 1, isMuted: false, isSoloed: false },
         ]
       });
 

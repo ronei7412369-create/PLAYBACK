@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { Stem } from '../types';
 import { cn } from '../lib/utils';
@@ -157,7 +158,7 @@ const TrackDetailsModal: React.FC<{ stem: Stem, index: number, onClose: () => vo
   const { updateStemVolume, toggleStemMute, toggleStemSolo, setStemOutput, setStemEQ } = usePlayerStore();
   const trackColor = TRACK_COLORS[index % TRACK_COLORS.length];
 
-  return (
+  return createPortal(
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }}
@@ -171,7 +172,7 @@ const TrackDetailsModal: React.FC<{ stem: Stem, index: number, onClose: () => vo
           animate={{ y: 0 }}
           exit={{ y: "100%" }}
           transition={{ type: "spring", damping: 25, stiffness: 300 }}
-          className="w-full sm:w-[400px] bg-[#111112] border-t sm:border border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden"
+          className="w-full sm:w-[500px] max-w-full bg-[#111112] border-t sm:border border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -193,18 +194,18 @@ const TrackDetailsModal: React.FC<{ stem: Stem, index: number, onClose: () => vo
             </button>
           </div>
 
-          <div className="p-5 flex flex-col gap-6">
+          <div className="p-5 flex gap-6 overflow-y-auto max-h-[85vh]">
             
             {/* Primary Controls */}
-            <div className="flex gap-4">
+            <div className="flex flex-col gap-4 w-1/2">
                {/* Fader */}
-               <div className="flex-1 bg-[#0A0A0B] rounded-2xl p-4 border border-white/5 flex flex-col items-center">
+               <div className="bg-[#0A0A0B] rounded-2xl p-4 border border-white/5 flex flex-col items-center flex-1">
                   <div className="flex justify-between w-full mb-4">
                      <VolumeX size={16} className="text-white/30" />
                      <Volume2 size={16} className={stem.volume > 0.8 ? "" : "text-white/30"} style={stem.volume > 0.8 ? { color: trackColor } : {}} />
                   </div>
                   
-                  <div className="relative w-full h-48 flex justify-center py-2">
+                  <div className="relative w-full h-48 flex justify-center py-2 shrink-0">
                      <div className="absolute inset-y-0 w-2 bg-black rounded-full border border-white/10 shadow-inner" />
                      <input
                         type="range"
@@ -231,93 +232,97 @@ const TrackDetailsModal: React.FC<{ stem: Stem, index: number, onClose: () => vo
                      <span className="text-white/30 text-xs font-bold ml-1">%</span>
                   </div>
                </div>
+            </div>
 
-               {/* Buttons & Output */}
-               <div className="flex-1 flex flex-col gap-4">
+            {/* Right Column: Buttons & EQ */}
+            <div className="flex flex-col gap-4 w-1/2">
+               <div className="flex gap-4">
                   <button
                      onClick={() => toggleStemMute(stem.id)}
                      className={cn(
-                        "flex-1 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all border-2",
+                        "flex-1 rounded-2xl py-4 flex flex-col items-center justify-center gap-2 transition-all border-2",
                         stem.isMuted 
                            ? "bg-[#E74C3C]/20 border-[#E74C3C] text-[#E74C3C] shadow-[0_0_20px_rgba(231,76,60,0.2)]" 
                            : "bg-[#0A0A0B] border-white/5 text-white/40 hover:border-white/20"
                      )}
                   >
                      <VolumeX size={24} />
-                     <span className="font-black tracking-widest uppercase">Mute</span>
+                     <span className="font-black tracking-widest uppercase text-[10px]">Mute</span>
                   </button>
 
                   <button
                      onClick={() => toggleStemSolo(stem.id)}
                      className={cn(
-                        "flex-1 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all border-2",
+                        "flex-1 rounded-2xl py-4 flex flex-col items-center justify-center gap-2 transition-all border-2",
                         stem.isSoloed 
                            ? "bg-[#F1C40F]/20 border-[#F1C40F] text-[#F1C40F] shadow-[0_0_20px_rgba(241,196,15,0.2)]" 
                            : "bg-[#0A0A0B] border-white/5 text-white/40 hover:border-white/20"
                      )}
                   >
                      <Headphones size={24} />
-                     <span className="font-black tracking-widest uppercase">Solo</span>
+                     <span className="font-black tracking-widest uppercase text-[10px]">Solo</span>
                   </button>
+               </div>
 
-                  <div className="bg-[#0A0A0B] rounded-2xl border border-white/5 p-2 px-3">
-                     <label className="text-[9px] uppercase font-bold text-white/30 block mb-1">Output Routing</label>
-                     <select 
-                        value={stem.output}
-                        onChange={(e) => setStemOutput(stem.id, parseInt(e.target.value))}
-                        className="w-full bg-transparent text-sm font-black text-white outline-none appearance-none cursor-pointer"
-                     >
-                        <option value={1} className="bg-[#111112]">L (Click)</option>
-                        <option value={2} className="bg-[#111112]">R (Tracks)</option>
-                        <option value={3} className="bg-[#111112]">Stereo</option>
-                     </select>
+               <div className="bg-[#0A0A0B] rounded-2xl border border-white/5 p-3">
+                  <label className="text-[9px] uppercase font-bold text-white/30 block mb-2 tracking-widest">Output Routing</label>
+                  <select 
+                     value={stem.output}
+                     onChange={(e) => setStemOutput(stem.id, parseInt(e.target.value))}
+                     className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-sm font-black text-white outline-none cursor-pointer hover:bg-white/10 transition-colors"
+                  >
+                     <option value={1} className="bg-[#111112]">L (Click)</option>
+                     <option value={2} className="bg-[#111112]">R (Tracks)</option>
+                     <option value={3} className="bg-[#111112]">Stereo</option>
+                  </select>
+               </div>
+
+               {/* EQ Section */}
+               <div className="bg-[#0A0A0B] rounded-2xl p-4 border border-white/5 flex-1 flex flex-col">
+                  <div className="text-[10px] uppercase font-black tracking-widest mb-4" style={{ color: trackColor }}>Equalizer</div>
+                  <div className="flex gap-4 flex-1 min-h-[120px]">
+                     {['high', 'mid', 'low'].map((band) => {
+                        const value = stem.eq?.[band as keyof typeof stem.eq] || 0;
+                        const percentage = ((value + 24) / 48) * 100;
+                        
+                        return (
+                           <div key={band} className="flex-1 flex flex-col items-center gap-2">
+                              <div className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{band}</div>
+                              <div className="flex-1 relative w-full flex justify-center">
+                                 <div className="absolute inset-y-0 w-2 bg-[#111112] rounded-full border border-white/5 shadow-inner" />
+                                 <div 
+                                    className={cn(
+                                       "absolute bottom-0 w-2 rounded-b-full transition-all",
+                                       value > 0 ? "shadow-[0_0_10px_currentColor]" : ""
+                                    )}
+                                    style={{ height: `${percentage}%`, backgroundColor: value > 0 ? trackColor : '#E74C3C', color: trackColor }}
+                                 />
+                                 <input
+                                    type="range"
+                                    min="-24"
+                                    max="24"
+                                    step="1"
+                                    value={value}
+                                    onChange={(e) => setStemEQ(stem.id, band as 'high'|'mid'|'low', parseFloat(e.target.value))}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20 [writing-mode:bt-lr] [appearance:slider-vertical]"
+                                 />
+                              </div>
+                              <div className="text-[10px] font-mono tabular-nums text-white/60">
+                                 {value > 0 ? '+' : ''}{value}
+                              </div>
+                           </div>
+                        );
+                     })}
                   </div>
                </div>
-            </div>
 
-            {/* EQ Section */}
-            <div className="bg-[#0A0A0B] rounded-2xl p-4 border border-white/5">
-               <div className="text-[10px] uppercase font-black tracking-widest mb-4" style={{ color: trackColor }}>Equalizer</div>
-               <div className="flex gap-4 h-32">
-                  {['high', 'mid', 'low'].map((band) => {
-                     const value = stem.eq?.[band as keyof typeof stem.eq] || 0;
-                     const percentage = ((value + 24) / 48) * 100;
-                     
-                     return (
-                        <div key={band} className="flex-1 flex flex-col items-center gap-2">
-                           <div className="text-[10px] font-bold text-white/40 uppercase">{band}</div>
-                           <div className="flex-1 relative w-full flex justify-center">
-                              <div className="absolute inset-y-0 w-3 bg-[#111112] rounded-full border border-white/5" />
-                              <div 
-                                 className={cn(
-                                    "absolute bottom-0 w-3 rounded-b-full transition-all",
-                                    value > 0 ? "" : "bg-[#E74C3C]"
-                                 )}
-                                 style={{ height: `${percentage}%`, backgroundColor: value > 0 ? trackColor : undefined }}
-                              />
-                              <input
-                                 type="range"
-                                 min="-24"
-                                 max="24"
-                                 step="1"
-                                 value={value}
-                                 onChange={(e) => setStemEQ(stem.id, band as 'high'|'mid'|'low', parseFloat(e.target.value))}
-                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20 [writing-mode:bt-lr] [appearance:slider-vertical]"
-                              />
-                           </div>
-                           <div className="text-[10px] font-mono tabular-nums text-white/60">
-                              {value > 0 ? '+' : ''}{value}
-                           </div>
-                        </div>
-                     );
-                  })}
-               </div>
             </div>
 
           </div>
         </motion.div>
       </motion.div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
 

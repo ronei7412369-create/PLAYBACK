@@ -38,7 +38,8 @@ export const WaveformDisplay: React.FC = () => {
     seek(percentage * currentSong.duration);
   };
 
-  const playheadPosition = (currentTime / currentSong.duration) * 100;
+  const validDuration = currentSong.duration > 0 ? currentSong.duration : 1;
+  const playheadPosition = (currentTime / validDuration) * 100;
   
   // Use real peaks if available, else fallback logic
   const renderPeaks = currentSong.waveformPeaks || Array.from({ length: 120 }).map(() => 0);
