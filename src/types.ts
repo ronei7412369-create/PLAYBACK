@@ -68,6 +68,7 @@ export interface PlayerState {
   // Pad parameters
   activePadKey: string | null;
   padVolume: number;
+  padEq: { low: number; mid: number; high: number };
   customPads: Record<string, boolean>;
 
   // Actions
@@ -85,6 +86,7 @@ export interface PlayerState {
 
   toggleAmbientPad: (key: string, frequency: number) => void;
   setPadVolume: (volume: number) => void;
+  setPadEQ: (band: 'low' | 'mid' | 'high', value: number) => void;
   setCustomPad: (note: string, file: File) => Promise<void>;
   loadCustomPads: () => Promise<void>;
 

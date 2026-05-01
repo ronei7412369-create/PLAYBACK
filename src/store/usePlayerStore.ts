@@ -24,7 +24,9 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
           const userDoc = await getDoc(doc(db, 'users', user.uid));
           if (userDoc.exists()) {
             const data = userDoc.data();
-            if (data.isPaid) {
+            if (data.isBlocked) {
+              hasAccess = false;
+            } else if (data.isPaid) {
               hasAccess = true;
             } else if (data.trialEndsAt) {
               const trialEnd = data.trialEndsAt.toDate();
@@ -54,6 +56,7 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
   preloadedSongIds: [],
   activePadKey: null,
   padVolume: 0.5,
+  padEq: { low: 0, mid: 0, high: 0 },
   customPads: {},
   currentSong: null,
   isPlaying: false,
@@ -566,6 +569,11 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
   setPadVolume: (volume) => {
     audioEngine.setPadVolume(volume);
     set({ padVolume: volume });
+  },
+
+  setPadEQ: (band, value) => {
+    audioEngine.setPadEQ(band, value);
+    set((state) => ({ padEq: { ...state.padEq, [band]: value } }));
   },
 
   loadCustomPads: async () => {

@@ -34,6 +34,9 @@ export class AudioEngine {
 
   // Pad State
   private padGain: GainNode;
+  private padEqLow: BiquadFilterNode;
+  private padEqMid: BiquadFilterNode;
+  private padEqHigh: BiquadFilterNode;
   private padOscillators: OscillatorNode[] = [];
   private customPadBufferNode: AudioBufferSourceNode | null = null;
   private padDecodedCache: Map<string, AudioBuffer> = new Map();
@@ -83,7 +86,24 @@ export class AudioEngine {
 
     this.padGain = this.context.createGain();
     this.padGain.gain.value = 0;
-    this.padGain.connect(this.masterGain);
+    
+    this.padEqLow = this.context.createBiquadFilter();
+    this.padEqLow.type = 'lowshelf';
+    this.padEqLow.frequency.value = 320;
+    
+    this.padEqMid = this.context.createBiquadFilter();
+    this.padEqMid.type = 'peaking';
+    this.padEqMid.frequency.value = 1000;
+    this.padEqMid.Q.value = 0.5;
+    
+    this.padEqHigh = this.context.createBiquadFilter();
+    this.padEqHigh.type = 'highshelf';
+    this.padEqHigh.frequency.value = 3200;
+
+    this.padGain.connect(this.padEqLow);
+    this.padEqLow.connect(this.padEqMid);
+    this.padEqMid.connect(this.padEqHigh);
+    this.padEqHigh.connect(this.masterGain);
   }
 
   public setPitchShift(semitones: number) {
@@ -211,10 +231,16 @@ export class AudioEngine {
   }
 
   public setPadVolume(volume: number) {
-    // If it's currently active (not fading out/0), set the target volume directly
-    if (this.padOscillators.length > 0) {
-       this.padGain.gain.setTargetAtTime(volume, this.context.currentTime, 0.1);
+    if (this.padOscillators.length > 0 || this.customPadBufferNode) {
+       this.padGain.gain.cancelScheduledValues(this.context.currentTime);
+       this.padGain.gain.setTargetAtTime(volume, this.context.currentTime, 0.05);
     }
+  }
+
+  public setPadEQ(band: 'low' | 'mid' | 'high', value: number) {
+    if (band === 'low') this.padEqLow.gain.setTargetAtTime(value, this.context.currentTime, 0.05);
+    if (band === 'mid') this.padEqMid.gain.setTargetAtTime(value, this.context.currentTime, 0.05);
+    if (band === 'high') this.padEqHigh.gain.setTargetAtTime(value, this.context.currentTime, 0.05);
   }
 
   public async loadStemFromCache(id: string): Promise<number | null> {
@@ -366,7 +392,7 @@ export class AudioEngine {
     this.currentBeat = Math.floor(beatsPassed) % Math.max(1, this.timeSignature[0]);
 
     if (this.clickTrackEnabled) {
-      this.nextClickTime = this.context.currentTime;
+      this.syncMetronome();
       this.scheduleMetronome();
     }
   }
@@ -457,6 +483,21 @@ export class AudioEngine {
     }
   }
 
+  public syncMetronome() {
+    const currentSongTime = this.getCurrentTime();
+    const songSecondsPerBeat = 60.0 / this.bpm;
+    
+    const exactBeat = currentSongTime / songSecondsPerBeat;
+    let nextBeatIndex = Math.ceil(exactBeat - 0.001);
+    if (nextBeatIndex < 0) nextBeatIndex = 0;
+    
+    const nextBeatSongTime = nextBeatIndex * songSecondsPerBeat;
+    const timeToNextBeatReal = (nextBeatSongTime - currentSongTime) / this.playbackRate;
+    
+    this.nextClickTime = this.context.currentTime + timeToNextBeatReal;
+    this.currentBeat = nextBeatIndex % Math.max(1, this.timeSignature[0]);
+  }
+
   public toggleMetronome(enabled: boolean, bpm: number, timeSignatureStr: string = "4/4") {
     this.clickTrackEnabled = enabled;
     this.bpm = bpm;
@@ -467,7 +508,7 @@ export class AudioEngine {
     }
 
     if (enabled && this.isPlaying) {
-      this.nextClickTime = this.context.currentTime;
+      this.syncMetronome();
       this.scheduleMetronome();
     } else if (!enabled && this.clickTimerId) {
       clearTimeout(this.clickTimerId);
@@ -481,19 +522,22 @@ export class AudioEngine {
     if (parts.length === 2) {
       this.timeSignature = [parseInt(parts[0], 10) || 4, parseInt(parts[1], 10) || 4];
     }
+    if (this.isPlaying && this.clickTrackEnabled) {
+      this.syncMetronome();
+    }
   }
 
   private scheduleMetronome() {
     if (!this.isPlaying || !this.clickTrackEnabled) return;
     
-    const secondsPerBeat = 60.0 / (this.bpm * this.playbackRate);
+    const realSecondsPerBeat = 60.0 / (this.bpm * this.playbackRate);
     // Lookahead scheduling
     while (this.nextClickTime < this.context.currentTime + 0.1) {
       // Determine if beat is accented
       const isAccent = this.currentBeat === 0;
       this.playClick(this.nextClickTime, isAccent);
       
-      this.nextClickTime += secondsPerBeat;
+      this.nextClickTime += realSecondsPerBeat;
       this.currentBeat = (this.currentBeat + 1) % this.timeSignature[0];
     }
     
@@ -501,6 +545,7 @@ export class AudioEngine {
   }
 
   private playClick(time: number, isAccent: boolean) {
+    const t = Math.max(time, this.context.currentTime);
     const osc = this.context.createOscillator();
     const env = this.context.createGain();
     
@@ -508,12 +553,13 @@ export class AudioEngine {
     env.connect(this.clickGain);
     
     // Beat frequency
-    osc.frequency.setValueAtTime(isAccent ? 1200 : 800, time);
-    env.gain.setValueAtTime(isAccent ? 1 : 0.6, time);
-    env.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+    osc.frequency.setValueAtTime(isAccent ? 1200 : 800, t);
+    env.gain.setValueAtTime(0, Math.max(0, t - 0.001));
+    env.gain.setValueAtTime(isAccent ? 1 : 0.6, t);
+    env.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
     
-    osc.start(time);
-    osc.stop(time + 0.1);
+    osc.start(t);
+    osc.stop(t + 0.1);
   }
 
   public extractPeaks(buckets: number = 120): number[] {

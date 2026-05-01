@@ -10,7 +10,12 @@ service cloud.firestore {
     // --- PRIMITIVES & VALIDATION HELPERS ---
     function isSignedIn() { return request.auth != null; }
     function isAdmin() { 
-      return isSignedIn() && request.auth.token.email in ["rudson.p48@icloud.com", "rudson.p48@gmail.com", "rudson.p48@iclou.com", "ronei7412369@gmail.com"]; 
+      return isSignedIn() && ('email' in request.auth.token) && (
+        request.auth.token.email == "rudson.p48@icloud.com" || 
+        request.auth.token.email == "rudson.p48@gmail.com" || 
+        request.auth.token.email == "rudson.p48@iclou.com" || 
+        request.auth.token.email == "ronei7412369@gmail.com"
+      ); 
     }
     function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
     function incoming() { return request.resource.data; }
@@ -24,6 +29,7 @@ service cloud.firestore {
         && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 500))
         && (!('lastLogin' in data) || (data.lastLogin == request.time))
         && (!('isPaid' in data) || data.isPaid is bool)
+        && (!('isBlocked' in data) || data.isBlocked is bool)
         && (!('trialEndsAt' in data) || data.trialEndsAt is timestamp);
     }
 
@@ -32,6 +38,7 @@ service cloud.firestore {
         && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 500))
         && (!('lastLogin' in data) || (data.lastLogin == request.time))
         && (!('isPaid' in data) || data.isPaid is bool)
+        && (!('isBlocked' in data) || data.isBlocked is bool)
         && (!('trialEndsAt' in data) || data.trialEndsAt is timestamp);
     }
 

@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { usePlayerStore } from '../store/usePlayerStore';
-import { Volume2, Power, Edit3 } from 'lucide-react';
+import { Volume2, Power, Edit3, SlidersHorizontal, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -21,8 +21,9 @@ const PAD_KEYS = [
 ];
 
 export const PadsPlayer: React.FC = () => {
-  const { activePadKey, padVolume, customPads, toggleAmbientPad, setPadVolume, setCustomPad } = usePlayerStore();
+  const { activePadKey, padVolume, customPads, padEq, toggleAmbientPad, setPadVolume, setPadEQ, setCustomPad } = usePlayerStore();
   const [editMode, setEditMode] = useState(false);
+  const [showEq, setShowEq] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingNote, setEditingNote] = useState<string | null>(null);
 
@@ -69,17 +70,65 @@ export const PadsPlayer: React.FC = () => {
           </span>
         </div>
         
-        <div className="flex items-center gap-2 bg-white/[0.03] px-3 py-1.5 rounded-lg border border-white/5">
-           <Volume2 size={13} className="text-white/40" />
-           <input
-             type="range"
-             min="0"
-             max="1"
-             step="0.01"
-             value={padVolume}
-             onChange={(e) => setPadVolume(parseFloat(e.target.value))}
-             className="w-16 h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-[#00A3FF] hover:accent-white transition-all custom-slider"
-           />
+        <div className="flex items-center gap-2 relative">
+          <button 
+             onClick={() => setShowEq(!showEq)}
+             className={cn("p-1.5 rounded-lg transition-colors border", showEq ? "bg-[#00A3FF] border-[#00A3FF] text-white" : "bg-white/5 border-white/5 text-white/40 hover:text-white hover:bg-white/10")}
+          >
+             <SlidersHorizontal size={14} />
+          </button>
+          <div className="flex items-center gap-2 bg-white/[0.03] px-3 py-1.5 rounded-lg border border-white/5">
+             <Volume2 size={13} className="text-white/40" />
+             <input
+               type="range"
+               min="0"
+               max="1"
+               step="0.01"
+               value={padVolume}
+               onChange={(e) => setPadVolume(parseFloat(e.target.value))}
+               className="w-16 h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-[#00A3FF] hover:accent-white transition-all custom-slider"
+             />
+          </div>
+          
+          <AnimatePresence>
+            {showEq && (
+              <motion.div 
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 5 }}
+                className="absolute top-10 right-0 w-64 bg-[#111112] border border-white/10 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.5)] z-[100] flex flex-col gap-4"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-black text-[#00A3FF] tracking-widest">Pads EQ</span>
+                  <button onClick={() => setShowEq(false)} className="text-white/40 hover:text-white bg-white/5 rounded-full p-1">
+                    <X size={14} />
+                  </button>
+                </div>
+                
+                <div className="flex flex-col gap-3">
+                  {[
+                    { label: 'Low', band: 'low' as const, val: padEq.low },
+                    { label: 'Mid', band: 'mid' as const, val: padEq.mid },
+                    { label: 'High', band: 'high' as const, val: padEq.high }
+                  ].map(({ label, band, val }) => (
+                    <div key={band} className="flex items-center gap-3">
+                      <span className="text-[11px] text-white/50 font-bold w-7 uppercase">{label}</span>
+                      <input
+                        type="range"
+                        min="-24"
+                        max="24"
+                        value={val}
+                        onChange={(e) => setPadEQ(band, parseFloat(e.target.value))}
+                        onDoubleClick={() => setPadEQ(band, 0)}
+                        className="flex-1 h-1.5 bg-[#0A0A0B] border border-white/5 rounded-full appearance-none cursor-pointer custom-slider accent-[#00A3FF] hover:accent-white transition-all"
+                      />
+                      <span className="text-[10px] tabular-nums font-mono w-6 text-right text-white/70">{val > 0 ? `+${Math.round(val)}` : Math.round(val)}</span>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
