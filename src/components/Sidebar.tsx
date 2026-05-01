@@ -7,13 +7,15 @@ import { audioEngine } from '../services/audioEngine';
 import { Song } from '../types';
 import { PlayList } from './PlayList';
 import { TelegramImportModal } from './TelegramImportModal';
+import { SetlistModal } from './SetlistModal';
 
 export const Sidebar: React.FC = () => {
-  const { setlist, currentSong, setCurrentSong, importSong } = usePlayerStore();
+  const { setlist, currentSong, setCurrentSong, importSong, clearSetlist } = usePlayerStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isImporting, setIsImporting] = useState(false);
   const [showTelegramModal, setShowTelegramModal] = useState(false);
+  const [showSetlistModal, setShowSetlistModal] = useState(false);
 
   const handleFiles = async (files: File[]) => {
     if (files.length === 0) return;
@@ -150,19 +152,36 @@ export const Sidebar: React.FC = () => {
             <Clock size={20} className="text-white/20" />
           </div>
         </div>
-        <motion.button 
-          whileTap={{ scale: 0.98 }}
-          className="w-full py-4 bg-white/5 text-white/40 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/20 transition-all border border-white/5 flex items-center justify-center gap-3 group"
-        >
-          <Trash2 size={16} className="group-hover:animate-bounce" />
-          Clear Setlist
-        </motion.button>
+        <div className="flex gap-2">
+          <motion.button 
+            onClick={() => setShowSetlistModal(true)}
+            whileTap={{ scale: 0.98 }}
+            className="flex-1 py-4 bg-white/5 text-white rounded-2xl font-black text-xs uppercase tracking-[0.1em] hover:bg-white/10 hover:border-white/20 transition-all border border-white/5 flex items-center justify-center gap-2 group"
+          >
+            <ListMusic size={16} />
+            Setlists
+          </motion.button>
+          
+          <motion.button 
+            onClick={() => clearSetlist()}
+            whileTap={{ scale: 0.98 }}
+            title="Limpar Setlist"
+            className="w-14 py-4 bg-white/5 text-white/40 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/20 transition-all border border-white/5 flex items-center justify-center group"
+          >
+            <Trash2 size={16} className="group-hover:animate-bounce" />
+          </motion.button>
+        </div>
       </div>
       
       <TelegramImportModal 
         isOpen={showTelegramModal} 
         onClose={() => setShowTelegramModal(false)}
         onImport={handleFiles} 
+      />
+      
+      <SetlistModal
+        isOpen={showSetlistModal}
+        onClose={() => setShowSetlistModal(false)}
       />
     </aside>
   );

@@ -58,6 +58,7 @@ export interface PlayerState {
   isInfiniteLoop: boolean;
   isFadeOut: boolean;
   setlist: Song[];
+  savedSetlists: { id: string, name: string, songIds: string[] }[];
   
   // Real-time parameters
   playbackRate: number; // Tempo
@@ -83,6 +84,12 @@ export interface PlayerState {
   updateSongMetadata: (id: string, title: string, artist: string) => void;
   updateSongLyrics: (id: string, lyrics: string) => void;
   removeFromSetlist: (id: string) => void;
+  clearSetlist: () => void;
+  
+  // Saved Setlists
+  saveCurrentSetlist: (name: string) => Promise<void>;
+  loadSavedSetlist: (id: string) => Promise<void>;
+  deleteSavedSetlist: (id: string) => Promise<void>;
 
   toggleAmbientPad: (key: string, frequency: number) => void;
   setPadVolume: (volume: number) => void;

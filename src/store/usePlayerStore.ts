@@ -67,6 +67,7 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
   isInfiniteLoop: false,
   isFadeOut: false,
   setlist: [],
+  savedSetlists: [],
   playbackRate: 1.0,
   metronomeEnabled: false,
   isLRSplit: false,
@@ -74,10 +75,23 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
 
   initPersistence: async () => {
     try {
-      const savedSongs = await storageEngine.loadSongs();
+      const [savedSongs, savedSetlists] = await Promise.all([
+        storageEngine.loadSongs(),
+        storageEngine.loadSetlists().catch(() => [])
+      ]);
+      
+      const newState: any = {};
       if (savedSongs && savedSongs.length > 0) {
-        set({ setlist: savedSongs });
+        newState.setlist = savedSongs;
       }
+      if (savedSetlists && savedSetlists.length > 0) {
+        newState.savedSetlists = savedSetlists;
+      }
+      
+      if (Object.keys(newState).length > 0) {
+        set(newState);
+      }
+      
       get().loadCustomPads();
     } catch (e) {
       console.error("Failed to init storage", e);
@@ -549,6 +563,61 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
        setlist: state.setlist.filter(s => s.id !== id),
        currentSong: state.currentSong?.id === id ? null : state.currentSong
     }));
+  },
+  
+  clearSetlist: () => {
+    set({ setlist: [], currentSong: null });
+    audioEngine.pause();
+    audioEngine.clearStems();
+  },
+
+  saveCurrentSetlist: async (name) => {
+    const { setlist, savedSetlists } = get();
+    if (setlist.length === 0) return;
+    
+    const newSetlist = {
+      id: Math.random().toString(36).substr(2, 9),
+      name,
+      songIds: setlist.map(s => s.id)
+    };
+    
+    try {
+      await storageEngine.saveSetlist(newSetlist);
+      set({ savedSetlists: [...savedSetlists, newSetlist] });
+    } catch (e) {
+      console.error("Failed to save setlist", e);
+    }
+  },
+
+  loadSavedSetlist: async (id) => {
+    const { savedSetlists } = get();
+    const targetSetlist = savedSetlists.find(s => s.id === id);
+    if (!targetSetlist) return;
+    
+    try {
+      const allSongs = await storageEngine.loadSongs();
+      const loadedSongs = targetSetlist.songIds
+        .map(songId => allSongs.find(s => s.id === songId))
+        .filter(s => !!s); // filter out if missing for some reason
+        
+      set({ setlist: loadedSongs as any });
+      
+      if (loadedSongs.length > 0) {
+        get().setCurrentSong(loadedSongs[0]);
+      }
+    } catch (e) {
+      console.error("Failed to load setlist songs", e);
+    }
+  },
+
+  deleteSavedSetlist: async (id) => {
+    const { savedSetlists } = get();
+    try {
+      await storageEngine.deleteSetlist(id);
+      set({ savedSetlists: savedSetlists.filter(s => s.id !== id) });
+    } catch (e) {
+      console.error("Failed to delete setlist", e);
+    }
   },
 
   toggleAmbientPad: (key, frequency) => {

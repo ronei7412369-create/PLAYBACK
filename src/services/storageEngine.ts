@@ -1,6 +1,6 @@
 export class StorageEngine {
   private dbName = 'PrimeMultitrackDB';
-  private dbVersion = 1;
+  private dbVersion = 2;
   private db: IDBDatabase | null = null;
 
   async init(): Promise<void> {
@@ -14,6 +14,9 @@ export class StorageEngine {
         }
         if (!db.objectStoreNames.contains('stems')) {
           db.createObjectStore('stems', { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains('setlists')) {
+          db.createObjectStore('setlists', { keyPath: 'id' });
         }
       };
 
@@ -104,6 +107,39 @@ export class StorageEngine {
          resolve(keys.filter(k => k.startsWith('pad-')).map(k => k.replace('pad-', '')));
       };
       request.onerror = (err) => reject(err);
+    });
+  }
+
+  async loadSetlists(): Promise<any[]> {
+    if (!this.db) await this.init();
+    
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['setlists'], 'readonly');
+      const store = transaction.objectStore('setlists');
+      const request = store.getAll();
+
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = (err) => reject(err);
+    });
+  }
+
+  async saveSetlist(setlist: { id: string, name: string, songIds: string[] }): Promise<void> {
+    if (!this.db) await this.init();
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['setlists'], 'readwrite');
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = (err) => reject(err);
+      transaction.objectStore('setlists').put(setlist);
+    });
+  }
+
+  async deleteSetlist(id: string): Promise<void> {
+    if (!this.db) await this.init();
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['setlists'], 'readwrite');
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = (err) => reject(err);
+      transaction.objectStore('setlists').delete(id);
     });
   }
 

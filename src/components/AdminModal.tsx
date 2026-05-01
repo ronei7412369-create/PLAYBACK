@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { usePlayerStore } from '../store/usePlayerStore';
-import { X, Mail, Lock, User, Users, Plus, CheckCircle2, Circle, Search, CalendarPlus, ShieldAlert, ShieldCheck, UserX, Ban } from 'lucide-react';
-import { collection, query, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { X, Mail, Lock, User, Users, Plus, CheckCircle2, Circle, Search, CalendarPlus, ShieldAlert, ShieldCheck, UserX, Ban, Trash2 } from 'lucide-react';
+import { collection, query, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 
 export const AdminModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
@@ -74,6 +74,17 @@ export const AdminModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
       fetchUsers(); // Refresh list
     } catch (err) {
       console.error("Error blocking user status: ", err);
+    }
+  };
+
+  const deleteUser = async (userId: string) => {
+    if (!window.confirm('Tem certeza que deseja excluir este usuário permanentemente? Esta ação não pode ser desfeita.')) return;
+    
+    try {
+      await deleteDoc(doc(db, 'users', userId));
+      fetchUsers(); // Refresh list
+    } catch (err) {
+      console.error("Error deleting user: ", err);
     }
   };
 
@@ -252,10 +263,27 @@ export const AdminModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                 </div>
               ) : (
                 <div className="p-6 md:p-8 flex flex-col gap-6 h-full">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                     <div>
                       <h3 className="text-2xl font-black text-white">Gerenciar Usuários</h3>
                       <p className="text-white/50 text-sm mt-1">Controle acessos, libere trials e bloqueie contas.</p>
+                      
+                      <div className="flex gap-4 mt-6">
+                        <div className="bg-white/5 border border-white/5 p-4 rounded-2xl min-w-[120px]">
+                          <span className="text-[10px] text-white/40 uppercase font-bold tracking-wider">Total</span>
+                          <span className="block text-2xl font-black text-white mt-1">{userList.length}</span>
+                        </div>
+                        <div className="bg-[#00A3FF]/5 border border-[#00A3FF]/10 p-4 rounded-2xl min-w-[120px]">
+                          <span className="text-[10px] text-[#00A3FF]/70 uppercase font-bold tracking-wider">Ativos</span>
+                          <span className="block text-2xl font-black text-[#00A3FF] mt-1">
+                            {userList.filter(u => !u.isBlocked && (u.isPaid || (u.trialEndsAt && new Date() < u.trialEndsAt.toDate()))).length}
+                          </span>
+                        </div>
+                        <div className="bg-red-500/5 border border-red-500/10 p-4 rounded-2xl min-w-[120px]">
+                          <span className="text-[10px] text-red-500/70 uppercase font-bold tracking-wider">Bloqueados</span>
+                          <span className="block text-2xl font-black text-red-500 mt-1">{userList.filter(u => u.isBlocked).length}</span>
+                        </div>
+                      </div>
                     </div>
                     <div className="relative w-full md:w-72">
                       <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" size={18} />
@@ -340,7 +368,7 @@ export const AdminModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                                 onClick={() => toggleUserBlockStatus(user.id, user.isBlocked)}
                                 className={`flex flex-1 justify-center items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border ${user.isBlocked ? 'bg-white/10 border-white/20 text-white hover:bg-white/20' : 'bg-red-500/5 border-red-500/20 text-red-500 hover:bg-red-500/10 hover:border-red-500/40'}`}
                               >
-                                {user.isBlocked ? 'Desbloquear Conta' : 'Bloquear Conta'}
+                                {user.isBlocked ? 'Desbloquear' : 'Bloquear'}
                               </button>
                               <button 
                                 onClick={() => toggleUserPaidStatus(user.id, user.isPaid)}
@@ -348,6 +376,13 @@ export const AdminModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                                 className={`flex flex-1 justify-center items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border disabled:opacity-30 disabled:cursor-not-allowed ${user.isPaid ? 'bg-black/50 border-white/10 text-white hover:bg-white/5' : 'bg-[#00A3FF]/10 border-[#00A3FF]/30 text-[#00A3FF] hover:bg-[#00A3FF]/20 hover:border-[#00A3FF]/50'}`}
                               >
                                 {user.isPaid ? 'Revogar Vitalício' : 'Dar Vitalício'}
+                              </button>
+                              <button 
+                                onClick={() => deleteUser(user.id)}
+                                className="flex items-center justify-center p-2.5 rounded-xl transition-all border bg-red-500/10 border-red-500/30 text-red-500 hover:bg-red-500/20 hover:border-red-500/60"
+                                title="Excluir Usuário"
+                              >
+                                <Trash2 size={16} />
                               </button>
                             </div>
                           </div>

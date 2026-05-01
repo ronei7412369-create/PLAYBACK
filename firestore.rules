@@ -61,6 +61,9 @@ service cloud.firestore {
         && incoming().email == existing().email
         && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'lastLogin'])
       );
+
+      // Admin delete
+      allow delete: if isAdmin();
     }
   }
 }
