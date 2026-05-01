@@ -155,7 +155,7 @@ export default function App() {
 
   if (!hasAccess) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-transparent text-white p-6 text-center">
+      <div className="flex flex-col items-center justify-center h-[100dvh] bg-transparent text-white p-6 text-center">
         <BackgroundAnimation />
         <h1 className="text-3xl font-black mb-4">Período de Teste Expirado</h1>
         <p className="text-white/60 mb-8 max-w-md">Seu período de teste de 3 dias chegou ao fim. Para continuar usando o aplicativo e acessar todas as ferramentas, por favor, realize o pagamento da assinatura mensal.</p>
@@ -170,7 +170,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-transparent text-white overflow-hidden font-sans select-none relative">
+    <div className="flex flex-col h-[100dvh] bg-transparent text-white overflow-hidden font-sans select-none relative">
       <MidiController />
       <BackgroundAnimation />
       

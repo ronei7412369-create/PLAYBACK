@@ -78,7 +78,7 @@ export const MidiMapModal: React.FC<{ isOpen: boolean; onClose: () => void }> = 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="bg-[#0a0a0a] border border-white/10 rounded-3xl w-full max-w-2xl max-h-[85vh] overflow-hidden relative shadow-2xl flex flex-col"
+            className="bg-[#0a0a0a] border border-white/10 rounded-2xl md:rounded-3xl w-full max-w-2xl max-h-[90dvh] md:max-h-[85vh] overflow-hidden relative shadow-2xl flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-6 border-b border-white/5 shrink-0">

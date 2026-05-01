@@ -139,7 +139,7 @@ export const AdminModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className={`bg-[#0a0a0a] border border-white/10 rounded-3xl w-full max-w-5xl overflow-hidden relative shadow-2xl flex flex-col md:flex-row h-[85vh] transition-all duration-300`}
+            className={`bg-[#0a0a0a] border border-white/10 rounded-2xl md:rounded-3xl w-full max-w-5xl overflow-hidden relative shadow-2xl flex flex-col md:flex-row h-[90dvh] md:h-[85vh] transition-all duration-300`}
             onClick={(e) => e.stopPropagation()}
           >
             <button 

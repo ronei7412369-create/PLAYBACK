@@ -99,7 +99,7 @@ export const Sidebar: React.FC = () => {
   };
 
   return (
-    <aside className="w-80 bg-[#0A0A0B]/60 backdrop-blur-md border-r border-white/5 flex flex-col h-full overflow-hidden relative">
+    <aside className="w-[85vw] max-w-[320px] bg-[#0A0A0B]/60 backdrop-blur-md border-r border-white/5 flex flex-col h-full overflow-hidden relative">
       <div className="p-8 border-b border-white/5 flex items-center justify-between bg-gradient-to-b from-white/5 to-transparent">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-[#00A3FF]/10 rounded-lg flex items-center justify-center">

@@ -234,7 +234,7 @@ export const Header: React.FC = () => {
             <button 
               onClick={() => setShowMidiMap(true)}
               title="MIDI Mapeamento"
-              className="p-2 md:p-2.5 rounded-xl transition-all text-white/40 hover:text-[#00A3FF] hover:bg-[#00A3FF]/10 hidden sm:block"
+              className="p-2 md:p-2.5 rounded-xl transition-all text-white/40 hover:text-[#00A3FF] hover:bg-[#00A3FF]/10"
             >
               <Settings size={18} className="md:w-5 md:h-5" />
             </button>

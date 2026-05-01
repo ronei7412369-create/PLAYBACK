@@ -23,7 +23,7 @@ export const LoginScreen: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-transparent text-white overflow-hidden relative">
+    <div className="flex h-[100dvh] bg-transparent text-white overflow-hidden relative">
       <BackgroundAnimation />
       <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-[#050505] pointer-events-none" />
 
