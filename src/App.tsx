@@ -12,7 +12,7 @@ import { MidiController } from './components/MidiController';
 import { MidiMapModal } from './components/MidiMapModal';
 import { cn } from './lib/utils';
 import { Sliders, Type, Grid, Music, Settings2 } from 'lucide-react';
-import { auth } from './services/firebase';
+import { auth, handleRedirectResult } from './services/firebase';
 
 import { Teleprompter } from './components/Teleprompter';
 import { PadsPlayer } from './components/PadsPlayer';
@@ -32,6 +32,7 @@ export default function App() {
 
   useEffect(() => {
     initPersistence();
+    handleRedirectResult();
   }, [initPersistence]);
 
   // Keep screen active while playing

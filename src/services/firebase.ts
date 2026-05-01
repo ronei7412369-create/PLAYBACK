@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut as fbSignOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut as fbSignOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -8,9 +8,11 @@ export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
-export const signInWithGoogle = async () => {
+export const handleRedirectResult = async () => {
   try {
-    const result = await signInWithPopup(auth, googleProvider);
+    const result = await getRedirectResult(auth);
+    if (!result) return null;
+    
     const user = result.user;
     
     // Create/update user document in firestore
@@ -44,7 +46,56 @@ export const signInWithGoogle = async () => {
     
     return user;
   } catch (error) {
-    console.error("Error signing in with Google: ", error);
+    console.error("Error with redirect result: ", error);
+  }
+};
+
+export const signInWithGoogle = async () => {
+  try {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+      await signInWithRedirect(auth, googleProvider);
+      return; // Will redirect away
+    }
+    
+    const result = await signInWithPopup(auth, googleProvider);
+    const user = result.user;
+    
+    // Create/update user document in firestore
+    const userRef = doc(db, 'users', user.uid);
+    const userDoc = await getDoc(userRef);
+    
+    if (!userDoc.exists()) {
+      const trialEndsAtDate = new Date();
+      trialEndsAtDate.setDate(trialEndsAtDate.getDate() + 3);
+
+      const data: any = {
+        email: user.email,
+        createdAt: serverTimestamp(),
+        lastLogin: serverTimestamp(),
+        trialEndsAt: trialEndsAtDate,
+        isPaid: false
+      };
+      if (user.displayName) data.displayName = user.displayName;
+      if (user.photoURL) data.photoURL = user.photoURL;
+      
+      await setDoc(userRef, data);
+    } else {
+      const data: any = {
+        lastLogin: serverTimestamp(),
+      };
+      if (user.displayName) data.displayName = user.displayName;
+      if (user.photoURL) data.photoURL = user.photoURL;
+      
+      await setDoc(userRef, data, { merge: true });
+    }
+    
+    return user;
+  } catch (error: any) {
+    if (error?.code !== 'auth/popup-closed-by-user' && error?.code !== 'auth/cancelled-popup-request') {
+      console.error("Error signing in with Google: ", error);
+    }
     throw error;
   }
 };

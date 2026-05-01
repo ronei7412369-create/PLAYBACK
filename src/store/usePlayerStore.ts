@@ -487,8 +487,10 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
   login: async () => {
     try {
       await signInWithGoogle();
-    } catch (e) {
-      console.error("Login failed", e);
+    } catch (e: any) {
+      if (e?.code !== 'auth/popup-closed-by-user' && e?.code !== 'auth/cancelled-popup-request') {
+        console.error("Login failed", e);
+      }
     }
   },
   loginWithEmail: async (email, password) => {
