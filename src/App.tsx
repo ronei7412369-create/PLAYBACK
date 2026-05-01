@@ -8,9 +8,10 @@ import { WaveformDisplay } from './components/WaveformDisplay';
 import { Mixer } from './components/Mixer';
 import { TransportControls } from './components/TransportControls';
 import { LoginScreen } from './components/LoginScreen';
-import { useMIDI } from './hooks/useMIDI';
+import { MidiController } from './components/MidiController';
+import { MidiMapModal } from './components/MidiMapModal';
 import { cn } from './lib/utils';
-import { Sliders, Type, Grid, Music } from 'lucide-react';
+import { Sliders, Type, Grid, Music, Settings2 } from 'lucide-react';
 import { auth } from './services/firebase';
 
 import { Teleprompter } from './components/Teleprompter';
@@ -29,9 +30,6 @@ export default function App() {
 
   const [mobileView, setMobileView] = useState<MobileView>('mixer');
 
-  useMIDI(); // Initialize MIDI foot pedals
-
-  
   useEffect(() => {
     initPersistence();
   }, [initPersistence]);
@@ -173,6 +171,7 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen bg-transparent text-white overflow-hidden font-sans select-none relative">
+      <MidiController />
       <BackgroundAnimation />
       
       <Header />

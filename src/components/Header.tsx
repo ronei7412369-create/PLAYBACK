@@ -6,10 +6,14 @@ import { cn } from '../lib/utils';
 import { AdminModal } from './AdminModal';
 import { StemSplitter } from './StemSplitter';
 
+import { MidiMapModal } from './MidiMapModal';
+import { AnimatedLogo } from './AnimatedLogo';
+
 export const Header: React.FC = () => {
   const { currentSong, masterVolume, setMasterVolume, masterEq, setMasterEQ, isPlaying, toggleMetronome, metronomeEnabled, isLRSplit, toggleLRSplit, isStageMode, toggleStageMode, logout, isSidebarOpen, setShowSidebar, tapTempo, updateBpm, cycleTimeSignature, pitchShift, setPitchShift, isAdmin } = usePlayerStore();
   const [showEq, setShowEq] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
+  const [showMidiMap, setShowMidiMap] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const eqRef = useRef<HTMLDivElement>(null);
 
@@ -61,12 +65,9 @@ export const Header: React.FC = () => {
           animate={{ opacity: 1, x: 0 }}
           className="flex items-center gap-2 md:gap-3 shrink-0"
         >
-          <div className="w-9 h-9 md:w-10 md:h-10 bg-gradient-to-br from-[#00A3FF] to-[#0066FF] rounded-xl flex items-center justify-center shadow-lg shadow-[#00A3FF]/20">
-            <ShieldCheck size={18} className="text-white md:w-6 md:h-6" />
-          </div>
+          <AnimatedLogo size="sm" />
           <div className="flex flex-col hidden sm:flex">
-            <span className="text-[9px] md:text-[10px] text-[#00A3FF] uppercase tracking-[0.2em] font-black">Prime</span>
-            <span className="text-white font-black text-sm md:text-xl tracking-tighter">GIG PLAY</span>
+            <span className="text-white font-black text-sm md:text-xl tracking-tighter">GIG <span className="text-[#00A3FF]">PLAY</span></span>
           </div>
         </motion.div>
         
@@ -230,6 +231,13 @@ export const Header: React.FC = () => {
             >
               <MonitorPlay size={18} className="md:w-5 md:h-5" />
             </button>
+            <button 
+              onClick={() => setShowMidiMap(true)}
+              title="MIDI Mapeamento"
+              className="p-2 md:p-2.5 rounded-xl transition-all text-white/40 hover:text-[#00A3FF] hover:bg-[#00A3FF]/10 hidden sm:block"
+            >
+              <Settings size={18} className="md:w-5 md:h-5" />
+            </button>
             {isAdmin && (
               <button 
                 onClick={() => setShowAdmin(true)}
@@ -263,6 +271,7 @@ export const Header: React.FC = () => {
         </div>
       </div>
       <AdminModal isOpen={showAdmin} onClose={() => setShowAdmin(false)} />
+      <MidiMapModal isOpen={showMidiMap} onClose={() => setShowMidiMap(false)} />
     </header>
   );
 };

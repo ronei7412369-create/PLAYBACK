@@ -3,6 +3,7 @@ import { usePlayerStore } from '../store/usePlayerStore';
 import { motion } from 'motion/react';
 import { Mail, Lock } from 'lucide-react';
 import { BackgroundAnimation } from './BackgroundAnimation';
+import { AnimatedLogo } from './AnimatedLogo';
 
 export const LoginScreen: React.FC = () => {
   const { login, loginWithEmail } = usePlayerStore();
@@ -32,14 +33,9 @@ export const LoginScreen: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           className="flex flex-col items-center gap-4 mb-12"
         >
-          <div className="w-16 h-16 bg-[#002D4A] rounded-2xl flex items-center justify-center shadow-lg shadow-[#00A3FF]/20">
-            <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' className="w-10 h-10">
-              <path d='M25 40h10v20H25zM45 25h10v50H45zM65 35h10v30H65z' fill='#00A3FF'/>
-            </svg>
-          </div>
-          <div className="flex flex-col items-center">
-            <span className="text-xs text-[#00A3FF] uppercase tracking-[0.3em] font-black">Prime</span>
-            <span className="text-white font-black text-3xl tracking-tighter">MULTITRACK</span>
+          <AnimatedLogo size="lg" />
+          <div className="flex flex-col items-center mt-2">
+            <span className="text-white font-black text-4xl tracking-tighter drop-shadow-md">GIG <span className="text-[#00A3FF]">PLAY</span></span>
           </div>
         </motion.div>
 
