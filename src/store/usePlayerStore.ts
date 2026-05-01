@@ -5,43 +5,55 @@ import { storageEngine } from '../services/storageEngine';
 
 import { auth, signInWithGoogle, signOut, signInWithEmail, signUpWithEmail, createInternalUserWithEmail, db } from '../services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 
 let lastTaps: number[] = [];
 
 export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set, get) => {
   // Listen to Firebase auth state
-  onAuthStateChanged(auth, async (user) => {
+  onAuthStateChanged(auth, (user) => {
     const adminEmails = ["rudson.p48@icloud.com", "rudson.p48@gmail.com", "rudson.p48@iclou.com", "ronei7412369@gmail.com"];
     const isAdmin = user ? adminEmails.includes(user.email || "") : false;
-    let hasAccess = false;
 
-    if (user) {
-      if (isAdmin) {
-        hasAccess = true;
-      } else {
-        try {
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
-          if (userDoc.exists()) {
-            const data = userDoc.data();
-            if (data.isBlocked) {
-              hasAccess = false;
-            } else if (data.isPaid) {
-              hasAccess = true;
-            } else if (data.trialEndsAt) {
-              const trialEnd = data.trialEndsAt.toDate();
-              if (new Date() < trialEnd) {
-                hasAccess = true;
-              }
-            }
-          }
-        } catch (err) {
-          console.error("Error fetching user access data", err);
-        }
-      }
+    if (!user) {
+      set({ isAuthenticated: false, user: null, isAdmin: false, hasAccess: false });
+      return;
     }
 
-    set({ isAuthenticated: !!user, user, isAdmin, hasAccess });
+    if (isAdmin) {
+      set({ isAuthenticated: true, user, isAdmin, hasAccess: true });
+      return;
+    }
+
+    // Use onSnapshot to immediately catch document creation and subsequent admin changes
+    onSnapshot(doc(db, 'users', user.uid), (userDoc) => {
+      let hasAccess = false;
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        if (data.isBlocked) {
+          hasAccess = false;
+        } else if (data.isPaid) {
+          hasAccess = true;
+        } else if (data.trialEndsAt) {
+          try {
+            const trialEnd = data.trialEndsAt.toDate();
+            if (new Date() < trialEnd) {
+              hasAccess = true;
+            }
+          } catch (e) {
+            console.error("Error parsing date", e);
+            // Fallback for when data is written locally (Date object) before becoming a Timestamp
+            if (data.trialEndsAt instanceof Date && new Date() < data.trialEndsAt) {
+              hasAccess = true;
+            }
+          }
+        }
+      }
+      set({ isAuthenticated: true, user, isAdmin, hasAccess });
+    }, (error) => {
+      console.error("Error listening to user access data", error);
+      // In case of permission errors while doc is created, we don't grant default access.
+    });
   });
 
   return {
