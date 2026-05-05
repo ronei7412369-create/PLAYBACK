@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { Stem } from '../types';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { Settings, X, Volume2, VolumeX, Headphones, SlidersHorizontal } from 'lucide-react';
+import { audioEngine } from '../services/audioEngine';
 
 interface ChannelStripProps {
   stem: Stem;
@@ -18,14 +19,43 @@ const TRACK_COLORS = [
 ];
 
 const ChannelStrip: React.FC<ChannelStripProps> = ({ stem, index, onOpenDetails }) => {
-  const { updateStemVolume, isPlaying, toggleStemMute, toggleStemSolo } = usePlayerStore();
+  const { updateStemVolume, isPlaying, toggleStemMute, toggleStemSolo, currentSong } = usePlayerStore();
   const trackColor = TRACK_COLORS[index % TRACK_COLORS.length];
+  const bpm = currentSong?.bpm || 120;
+  const beatDuration = 60 / bpm;
+  
+  const meterRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let animationFrameId: number;
+
+    const renderLoop = () => {
+      if (meterRef.current) {
+        if (!isPlaying || stem.isMuted) {
+          meterRef.current.style.height = '0%';
+        } else {
+          // get real frequency level
+          const level = audioEngine.getStemLevel(stem.id);
+          // Scale it appropriately, 0-1 mapped to 0-100%
+          const percentage = Math.min(100, Math.max(0, level * 100));
+          meterRef.current.style.height = `${percentage}%`;
+        }
+      }
+      animationFrameId = requestAnimationFrame(renderLoop);
+    };
+
+    renderLoop();
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [isPlaying, stem.isMuted, stem.id]);
 
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex flex-col items-center w-20 md:w-24 shrink-0 h-full bg-[#0A0A0B]/80 backdrop-blur-sm border-r border-white/5 py-3 group relative overflow-hidden"
+      className="flex flex-col items-center w-16 sm:w-20 md:w-24 shrink-0 h-full bg-[#0A0A0B]/80 backdrop-blur-sm border-r border-white/5 py-2 md:py-3 group relative overflow-hidden"
     >
       {/* Background Glow */}
       <div className={cn(
@@ -34,18 +64,18 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({ stem, index, onOpenDetails 
       )} style={{ backgroundColor: (!stem.isSoloed && !stem.isMuted) ? `${trackColor}10` : undefined }} />
 
       {/* Label */}
-      <div className="w-full px-1 md:px-2 z-10 relative mb-2 flex items-center justify-center">
+      <div className="w-full px-1 md:px-2 z-10 relative mb-1 md:mb-2 flex items-center justify-center">
         <button 
           onClick={onOpenDetails}
           className={cn(
-            "w-full py-1.5 md:py-2 rounded-xl flex items-center justify-center transition-all duration-300 border-2 overflow-hidden",
+            "w-full py-1 md:py-2 rounded-lg md:rounded-xl flex items-center justify-center transition-all duration-300 border-2 overflow-hidden",
             stem.isMuted ? "bg-white/5 border-white/5" : "bg-white/10 shadow-[0_0_15px_rgba(0,0,0,0.2)]"
           )}
           style={{ borderColor: stem.isMuted ? undefined : `${trackColor}50`, color: trackColor }}
         >
           <span 
             className={cn(
-               "text-[9px] md:text-[10px] font-black uppercase text-center leading-tight tracking-[0.02em]",
+               "text-[8px] md:text-[10px] font-black uppercase text-center leading-tight tracking-[0.02em]",
                stem.isMuted ? "text-white/30" : "text-white"
             )}
             style={{ 
@@ -62,37 +92,31 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({ stem, index, onOpenDetails 
       </div>
 
       {/* Fader Area */}
-      <div className="flex-1 relative flex flex-col items-center w-full z-10 pb-6 pt-6">
+      <div className="flex-1 relative flex flex-col items-center w-full z-10 pb-4 md:pb-6 pt-4 md:pt-6">
         {/* VU Meter Container */}
-        <div className="absolute left-2 md:left-4 top-6 bottom-6 w-1.5 md:w-2 bg-black rounded-full overflow-hidden border border-white/10 shadow-inner">
-          <motion.div 
-            className="w-full shadow-[0_0_10px_rgba(46,204,113,0.5)]"
-            animate={{ 
-              height: !isPlaying || stem.isMuted ? '0%' : [`${Math.random() * 40}%`, `${Math.random() * 80}%`, `${Math.random() * 60}%`],
-              opacity: stem.isMuted ? 0.2 : 1
-            }}
-            transition={{ 
-              duration: 0.15, 
-              repeat: isPlaying ? Infinity : 0,
-              repeatType: "reverse"
-            }}
+        <div className="absolute left-1 sm:left-2 md:left-4 top-4 md:top-6 bottom-4 md:bottom-6 w-1 sm:w-1.5 md:w-2 bg-black rounded-full overflow-hidden border border-white/10 shadow-inner">
+          <div 
+            ref={meterRef}
+            className="w-full shadow-[0_0_10px_rgba(46,204,113,0.5)] transition-[height] duration-75"
             style={{ 
               position: 'absolute', bottom: 0, left: 0,
-              background: `linear-gradient(to top, ${trackColor}, #F1C40F, #E74C3C)`
+              background: `linear-gradient(to top, ${trackColor}, #F1C40F, #E74C3C)`,
+              height: '0%',
+              opacity: stem.isMuted ? 0.2 : 1
             }}
           />
         </div>
 
         {/* Fader Track */}
         <div className="relative h-full w-full flex justify-center group/fader cursor-pointer" onClick={onOpenDetails}>
-          <div className="absolute top-0 bottom-0 w-1.5 bg-black rounded-full border border-white/10 shadow-inner" />
+          <div className="absolute top-0 bottom-0 w-1 sm:w-1.5 bg-black rounded-full border border-white/10 shadow-inner" />
           
           {/* Fader Tick Marks */}
-          <div className="absolute top-0 bottom-0 left-6 md:left-8 flex flex-col justify-between py-1 pointer-events-none opacity-20">
+          <div className="absolute top-0 bottom-0 left-4 sm:left-6 md:left-8 flex flex-col justify-between py-1 pointer-events-none opacity-20">
             {[0, 1, 2, 3, 4].map(i => (
               <div key={i} className="flex items-center gap-1">
                 <div className="w-1.5 md:w-2 h-[1px] bg-white" />
-                {i === 0 && <span className="text-[7px] font-black text-white absolute -right-3 top-[-3px]">0dB</span>}
+                {i === 0 && <span className="text-[6px] md:text-[7px] font-black text-white absolute -right-2 md:-right-3 top-[-3px] hidden sm:block">0dB</span>}
               </div>
             ))}
           </div>
@@ -111,7 +135,7 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({ stem, index, onOpenDetails 
           {/* Custom Fader Thumb */}
           <motion.div 
             className={cn(
-              "absolute w-8 md:w-10 h-10 md:h-12 rounded-xl shadow-2xl z-10 pointer-events-none flex flex-col items-center justify-center gap-1 border transition-colors duration-300",
+              "absolute w-6 sm:w-8 md:w-10 h-8 sm:h-10 md:h-12 rounded-lg md:rounded-xl shadow-2xl z-10 pointer-events-none flex flex-col items-center justify-center gap-0.5 md:gap-1 border transition-colors duration-300",
               stem.isMuted ? "bg-white/10 border-white/5" : "bg-gradient-to-br from-[#1A1A1C] to-[#0A0A0B]"
             )}
             style={{ 
@@ -121,32 +145,32 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({ stem, index, onOpenDetails 
             }}
             animate={{ scale: stem.isMuted ? 0.9 : 1 }}
           >
-            <div className={cn("w-4 md:w-6 h-[2px] rounded-full", stem.isMuted ? "bg-white/20" : "")} style={{ backgroundColor: stem.isMuted ? undefined : trackColor }} />
-            <div className={cn("w-4 md:w-6 h-[2px] rounded-full", stem.isMuted ? "bg-white/20" : "")} style={{ backgroundColor: stem.isMuted ? undefined : trackColor }} />
+            <div className={cn("w-3 sm:w-4 md:w-6 h-[2px] rounded-full", stem.isMuted ? "bg-white/20" : "")} style={{ backgroundColor: stem.isMuted ? undefined : trackColor }} />
+            <div className={cn("w-3 sm:w-4 md:w-6 h-[2px] rounded-full", stem.isMuted ? "bg-white/20" : "")} style={{ backgroundColor: stem.isMuted ? undefined : trackColor }} />
           </motion.div>
         </div>
       </div>
 
       {/* Quick Controls */}
-      <div className="mt-2 flex flex-col gap-1.5 z-10 px-2 w-full">
-         <div className="flex gap-1 w-full h-8">
+      <div className="mt-1 flex flex-col gap-1 z-10 px-1 w-full">
+         <div className="flex gap-1 w-full h-8 md:h-8">
             <button
                onClick={() => toggleStemMute(stem.id)}
                className={cn(
-                 "flex-1 rounded-lg flex items-center justify-center transition-all",
+                 "flex-1 rounded md:rounded-lg flex items-center justify-center transition-all",
                  stem.isMuted ? "bg-[#E74C3C] text-white shadow-[0_0_15px_rgba(231,76,60,0.4)]" : "bg-white/5 text-white/40 hover:bg-white/10 hover:text-white"
                )}
             >
-               <span className="text-[10px] font-black">M</span>
+               <span className="text-[9px] md:text-[10px] font-black">M</span>
             </button>
             <button
                onClick={() => toggleStemSolo(stem.id)}
                className={cn(
-                 "flex-1 rounded-lg flex items-center justify-center transition-all",
+                 "flex-1 rounded md:rounded-lg flex items-center justify-center transition-all",
                  stem.isSoloed ? "bg-[#F1C40F] text-black shadow-[0_0_15px_rgba(241,196,15,0.4)]" : "bg-white/5 text-white/40 hover:bg-white/10 hover:text-white"
                )}
             >
-               <span className="text-[10px] font-black">S</span>
+               <span className="text-[9px] md:text-[10px] font-black">S</span>
             </button>
          </div>
       </div>

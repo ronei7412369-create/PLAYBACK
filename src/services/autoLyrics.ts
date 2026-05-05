@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
 export async function generateLyricsAndChords(title: string, artist: string = ""): Promise<string> {
-  const query = `Please provide the lyrics with chords for the song "${title}" ${artist ? `by ${artist}` : ''}. Format the output in Markdown. Use the format \`[C] [G]\` for chords placed accurately above the lyrics. Provide ONLY the markdown text, no surrounding explanations or filler text. Start directly with the first verse or section header like "## Verse 1".`;
+  const query = `Por favor, forneça a letra com as cifras para a música "${title}" ${artist ? `por ${artist}` : ''}. IMPORTANTE: Retorne a letra totalmente traduzida para o PORTUGUÊS (PT-BR), caso a música não seja brasileira. Adapte as cifras sobre a letra traduzida o melhor possível. Formate a saída em Markdown. Use o formato \`[C] [G]\` para as cifras colocadas precisamente acima da letra. Forneça APENAS o texto em markdown, sem explicações ou textos adicionais. Comece diretamente com o primeiro verso ou cabeçalho da seção como "## Verso 1" ou "## Intro".`;
   
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });

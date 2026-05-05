@@ -15,6 +15,7 @@ export class AudioEngine {
     eqLow: BiquadFilterNode;
     eqMid: BiquadFilterNode;
     eqHigh: BiquadFilterNode;
+    analyser: AnalyserNode;
     source: AudioBufferSourceNode | null;
   }> = new Map();
   
@@ -267,14 +268,19 @@ export class AudioEngine {
     eqHigh.frequency.value = 3200; // 3.2kHz
     eqHigh.gain.value = 0;
     
+    const analyser = this.context.createAnalyser();
+    analyser.fftSize = 64;
+    analyser.smoothingTimeConstant = 0.8;
+    
     // Connect Chain: Source -> Gain -> EQ Low -> EQ Mid -> EQ High -> Panner -> Master
     gain.connect(eqLow);
     eqLow.connect(eqMid);
     eqMid.connect(eqHigh);
     eqHigh.connect(panner);
+    eqHigh.connect(analyser); // connect to analyser
     panner.connect(this.masterGain);
 
-    this.stems.set(id, { buffer: audioBuffer, gain, panner, eqLow, eqMid, eqHigh, source: null });
+    this.stems.set(id, { buffer: audioBuffer, gain, panner, eqLow, eqMid, eqHigh, analyser, source: null });
     return audioBuffer.duration;
   }
 
@@ -327,14 +333,19 @@ export class AudioEngine {
     eqHigh.frequency.value = 3200; // 3.2kHz
     eqHigh.gain.value = 0;
     
+    const analyser = this.context.createAnalyser();
+    analyser.fftSize = 64;
+    analyser.smoothingTimeConstant = 0.8;
+    
     // Connect Chain: Source -> Gain -> EQ Low -> EQ Mid -> EQ High -> Panner -> Master
     gain.connect(eqLow);
     eqLow.connect(eqMid);
     eqMid.connect(eqHigh);
     eqHigh.connect(panner);
+    eqHigh.connect(analyser); // connect to analyser
     panner.connect(this.masterGain);
 
-    this.stems.set(id, { buffer: audioBuffer, gain, panner, eqLow, eqMid, eqHigh, source: null });
+    this.stems.set(id, { buffer: audioBuffer, gain, panner, eqLow, eqMid, eqHigh, analyser, source: null });
     return audioBuffer.duration;
   }
 
@@ -560,6 +571,23 @@ export class AudioEngine {
     
     osc.start(t);
     osc.stop(t + 0.1);
+  }
+
+  public getStemLevel(id: string): number {
+    const stem = this.stems.get(id);
+    if (!stem || !stem.analyser) return 0;
+    
+    const dataArray = new Uint8Array(stem.analyser.frequencyBinCount);
+    stem.analyser.getByteFrequencyData(dataArray);
+    
+    // Calculate peak instead of average for more responsive VU meter
+    let max = 0;
+    for (let i = 0; i < dataArray.length; i++) {
+        if (dataArray[i] > max) {
+            max = dataArray[i];
+        }
+    }
+    return max / 255; // return normalized 0-1
   }
 
   public extractPeaks(buckets: number = 120): number[] {

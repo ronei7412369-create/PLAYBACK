@@ -268,14 +268,14 @@ export default function App() {
                  </div>
 
                  <div className={cn(
-                   "flex-1 flex flex-col sm:flex-row gap-4 px-4 pb-4 sm:bg-[#050506]/50 min-h-0",
-                   "sm:overflow-hidden overflow-y-auto",
+                   "flex-1 flex flex-col sm:flex-row gap-4 sm:px-4 pb-4 sm:bg-[#050506]/50 min-h-0",
+                   "overflow-hidden",
                    (mobileView !== 'teleprompter' && mobileView !== 'pads') && "hidden sm:flex" 
                  )}>
                     {/* Teleprompter */}
                     <div className={cn(
-                      "flex-[2] rounded-xl bg-[#0A0A0B] border border-white/5 overflow-hidden group transition-all relative",
-                      "min-h-[400px] sm:min-h-0 sm:h-full",
+                      "flex-[2] rounded-none sm:rounded-xl bg-[#0A0A0B] sm:border border-white/5 overflow-hidden group transition-all relative",
+                      "h-full min-h-0",
                       "sm:block",
                       mobileView !== 'teleprompter' && "hidden sm:flex"
                     )}>

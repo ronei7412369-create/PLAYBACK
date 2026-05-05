@@ -12,11 +12,29 @@ export const Teleprompter: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+  const handleAutoGenerate = async () => {
+    if (!currentSong) return;
+    setIsGenerating(true);
+    setLocalLyrics('Gerando letra da música...');
+    try {
+      const result = await generateLyricsAndChords(currentSong.title, currentSong.artist);
+      setLocalLyrics(result);
+      updateSongLyrics(currentSong.id, result);
+      setIsEditing(false);
+    } catch (err) {
+      console.error(err);
+      setLocalLyrics('Erro ao buscar letra.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   useEffect(() => {
-    if (currentSong?.lyrics !== undefined) {
+    if (currentSong?.lyrics) {
       setLocalLyrics(currentSong.lyrics);
-    } else {
-      setLocalLyrics('## Your Lyrics Here\n\n```\n[C]       [G]\nAmazing Grace, how sweet the sound\n```\n\nEdit to add your content.');
+    } else if (currentSong) {
+      // Auto-generate if no lyrics exist
+      handleAutoGenerate();
     }
   }, [currentSong?.id]);
 
@@ -35,22 +53,6 @@ export const Teleprompter: React.FC = () => {
     if (currentSong) {
       updateSongLyrics(currentSong.id, localLyrics);
       setIsEditing(false);
-    }
-  };
-
-  const handleAutoGenerate = async () => {
-    if (!currentSong) return;
-    setIsGenerating(true);
-    try {
-      const result = await generateLyricsAndChords(currentSong.title, currentSong.artist);
-      setLocalLyrics(result);
-      updateSongLyrics(currentSong.id, result);
-      setIsEditing(false);
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao buscar letra.');
-    } finally {
-      setIsGenerating(false);
     }
   };
 
@@ -101,6 +103,7 @@ export const Teleprompter: React.FC = () => {
         ref={scrollContainerRef}
         className={cn(
           "flex-1 overflow-y-auto px-6 py-8 custom-scrollbar relative",
+          !isEditing && "scroll-smooth",
           isEditing && "p-0"
         )}
       >
