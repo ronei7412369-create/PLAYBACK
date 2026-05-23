@@ -268,13 +268,13 @@ export default function App() {
                  </div>
 
                  <div className={cn(
-                   "flex-1 flex flex-col sm:flex-row gap-4 sm:px-4 pb-4 sm:bg-[#050506]/50 min-h-0",
+                   "flex-1 flex flex-col sm:flex-row gap-4 sm:px-4 pb-4 min-h-0",
                    "overflow-hidden",
                    (mobileView !== 'teleprompter' && mobileView !== 'pads') && "hidden sm:flex" 
                  )}>
                     {/* Teleprompter */}
                     <div className={cn(
-                      "flex-[2] rounded-none sm:rounded-xl bg-[#0A0A0B] sm:border border-white/5 overflow-hidden group transition-all relative",
+                      "flex-[2] rounded-none sm:rounded-[20px] ios-glass sm:border border-white/10 shadow-xl overflow-hidden group transition-all relative",
                       "h-full min-h-0",
                       "sm:block",
                       mobileView !== 'teleprompter' && "hidden sm:flex"
@@ -284,7 +284,7 @@ export default function App() {
                     
                     {/* Pads */}
                     <div className={cn(
-                      "flex-none w-full sm:w-[360px] rounded-xl bg-[#0A0A0B] border border-white/5 overflow-hidden p-3",
+                      "flex-none w-full sm:w-[360px] rounded-[20px] ios-glass border border-white/10 shadow-xl overflow-hidden p-3",
                       "min-h-[350px] sm:min-h-0 sm:h-full",
                       "sm:block",
                       mobileView !== 'pads' && "hidden sm:block"

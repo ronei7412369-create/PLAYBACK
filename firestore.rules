@@ -64,6 +64,15 @@ service cloud.firestore {
 
       // Admin delete
       allow delete: if isAdmin();
+      
+      // --- SUBCOLLECTIONS ---
+      match /songs/{songId} {
+        allow read, write: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
+      }
+      
+      match /setlists/{setlistId} {
+        allow read, write: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
+      }
     }
   }
 }

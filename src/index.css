@@ -1,17 +1,41 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", "Orbitron", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Outfit", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
 }
 
 @layer utilities {
-  /* Vertical Light Streaks & CRT Scanlines */
+  /* Ultra-Premium spatial iOS glassmorphism */
+  .ios-glass {
+    background: rgba(10, 10, 15, 0.55);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    box-shadow: 
+      0 30px 60px -15px rgba(0, 0, 0, 0.6), 
+      inset 0 1px 1px rgba(255, 255, 255, 0.08);
+  }
+  
+  .ios-glass-accent {
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 
+      0 10px 30px rgba(0, 0, 0, 0.2), 
+      inset 0 1px 1px rgba(255, 255, 255, 0.1);
+  }
+
   .vertical-streaks {
-    background-image: linear-gradient(90deg, transparent 99%, rgba(0, 255, 255, 0.03) 100%);
+    background-image: linear-gradient(90deg, transparent 99%, rgba(255, 255, 255, 0.015) 100%);
     background-size: 10vw 100%;
   }
+
   .crt-scanlines {
-    background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2));
+    background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.15));
     background-size: 100% 4px;
   }
 }
+

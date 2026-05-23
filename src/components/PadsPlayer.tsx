@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { usePlayerStore } from '../store/usePlayerStore';
-import { Volume2, Power, Edit3, SlidersHorizontal, X } from 'lucide-react';
+import { Volume2, Power, Edit3, SlidersHorizontal, X, Music } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -48,7 +48,7 @@ export const PadsPlayer: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full relative p-1">
+    <div className="flex flex-col h-full relative p-1.5">
       <input 
          type="file"
          ref={fileInputRef}
@@ -58,20 +58,22 @@ export const PadsPlayer: React.FC = () => {
       />
       <div className="flex justify-between items-start mb-4">
         <div className="flex flex-col flex-1">
-          <span className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-black leading-none mb-1.5">Continuous</span>
+          <span className="text-[9px] text-white/30 uppercase tracking-[0.25em] font-black leading-none mb-1.5">Synthesis</span>
           <div className="flex items-center gap-2">
-            <span className="text-white font-black text-lg tracking-tight leading-none drop-shadow-md">
+            <span className="text-white font-extrabold text-[11px] uppercase tracking-widest leading-none">
                AMBIENT PADS
-            </span>
-            <button 
+             </span>
+             <button 
                 onClick={() => setEditMode(!editMode)}
                 className={cn(
-                  "p-1.5 rounded-lg transition-all", 
-                  editMode ? "bg-red-500 text-white shadow-[0_0_10px_rgba(239,68,68,0.5)]" : "bg-white/5 text-white/40 hover:bg-white/10 hover:text-white"
+                  "p-1.5 rounded-lg transition-all border", 
+                  editMode 
+                    ? "bg-[#FF3B30]/15 border-[#FF3B30] text-[#FF3B30] shadow-[0_0_10px_rgba(255,59,48,0.25)]" 
+                    : "bg-white/5 border-white/5 text-white/35 hover:bg-white/10 hover:text-white"
                 )}
                 title="Editar Pads"
              >
-                <Edit3 size={12} />
+                <Edit3 size={11} />
              </button>
           </div>
         </div>
@@ -81,13 +83,15 @@ export const PadsPlayer: React.FC = () => {
              onClick={() => setShowEq(!showEq)}
              className={cn(
                "p-2.5 rounded-xl transition-all border outline-none", 
-               showEq ? "bg-[#00A3FF] border-[#00A3FF] text-white shadow-[0_0_15px_rgba(0,163,255,0.4)]" : "bg-[#1A1A1C] border-white/5 text-white/40 hover:text-white hover:bg-[#222224] hover:border-white/10"
+               showEq 
+                 ? "bg-[#00A3FF]/15 border-[#00A3FF] text-[#00A3FF] shadow-[0_0_15px_rgba(0,163,255,0.2)]" 
+                 : "bg-white/5 border-white/5 text-white/35 hover:text-white hover:bg-white/10"
              )}
           >
-             <SlidersHorizontal size={14} />
+             <SlidersHorizontal size={13} />
           </button>
-          <div className="flex items-center gap-3 bg-[#1A1A1C] px-4 py-2.5 rounded-xl border border-white/5 h-full">
-             <Volume2 size={14} className="text-white/40" />
+          <div className="flex items-center gap-2.5 bg-black/40 px-3 py-2 rounded-xl border border-white/5 h-[34px]">
+             <Volume2 size={13} className="text-white/35" />
              <input
                type="range"
                min="0"
@@ -95,7 +99,7 @@ export const PadsPlayer: React.FC = () => {
                step="0.01"
                value={padVolume}
                onChange={(e) => setPadVolume(parseFloat(e.target.value))}
-               className="w-16 h-1.5 bg-black/50 border border-white/5 rounded-full appearance-none cursor-pointer accent-[#00A3FF] hover:accent-white transition-all custom-slider"
+               className="w-14 h-1 bg-black/60 rounded-full appearance-none cursor-pointer accent-[#00A3FF] hover:accent-white transition-all custom-slider"
              />
           </div>
           
@@ -105,26 +109,26 @@ export const PadsPlayer: React.FC = () => {
                 initial={{ opacity: 0, scale: 0.95, y: 10 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                className="absolute top-14 right-0 w-64 bg-[#0A0A0B] border border-white/10 rounded-2xl p-5 shadow-[0_20px_60px_rgba(0,0,0,0.8)] z-[100] flex flex-col gap-5 origin-top-right backdrop-blur-xl"
+                className="absolute top-11 right-0 w-60 bg-black/90 border border-white/15 rounded-2xl p-4.5 shadow-[0_20px_50px_rgba(0,0,0,0.9)] z-[100] flex flex-col gap-4 origin-top-right backdrop-blur-2xl"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs uppercase font-black text-[#00A3FF] tracking-widest flex items-center gap-2">
-                    <SlidersHorizontal size={12} />
+                  <span className="text-[10px] uppercase font-black text-[#00A3FF] tracking-widest flex items-center gap-2">
+                    <SlidersHorizontal size={11} />
                     Pads EQ
                   </span>
-                  <button onClick={() => setShowEq(false)} className="text-white/40 hover:text-white bg-white/5 hover:bg-white/10 rounded-full p-1.5 transition-colors">
-                    <X size={14} />
+                  <button onClick={() => setShowEq(false)} className="text-white/40 hover:text-white bg-white/5 hover:bg-white/10 rounded-full p-1 transition-colors border border-white/5">
+                    <X size={12} />
                   </button>
                 </div>
                 
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-3.5">
                   {[
                     { label: 'Low', band: 'low' as const, val: padEq.low, color: '#00A3FF' },
-                    { label: 'Mid', band: 'mid' as const, val: padEq.mid, color: '#FFB800' },
+                    { label: 'Mid', band: 'mid' as const, val: padEq.mid, color: '#FFD60A' },
                     { label: 'High', band: 'high' as const, val: padEq.high, color: '#FF3B30' }
                   ].map(({ label, band, val, color }) => (
-                    <div key={band} className="flex items-center gap-3">
-                      <span className="text-[10px] text-white/50 font-black w-8 uppercase tracking-widest">{label}</span>
+                    <div key={band} className="flex items-center gap-2.5">
+                      <span className="text-[9px] text-white/40 font-extrabold w-8 uppercase tracking-wider">{label}</span>
                       <input
                         type="range"
                         min="-24"
@@ -132,10 +136,10 @@ export const PadsPlayer: React.FC = () => {
                         value={val}
                         onChange={(e) => setPadEQ(band, parseFloat(e.target.value))}
                         onDoubleClick={() => setPadEQ(band, 0)}
-                        className="flex-1 h-1.5 bg-black/50 border border-white/5 rounded-full appearance-none cursor-pointer custom-slider transition-all"
+                        className="flex-1 h-1 bg-black/60 rounded-full appearance-none cursor-pointer custom-slider transition-all"
                         style={{ accentColor: color }}
                       />
-                      <span className="text-[10px] tabular-nums font-mono w-7 text-right font-bold" style={{ color: val === 0 ? 'rgba(255,255,255,0.3)' : color }}>
+                      <span className="text-[9px] tabular-nums font-mono w-7 text-right font-bold" style={{ color: val === 0 ? 'rgba(255,255,255,0.2)' : color }}>
                         {val > 0 ? `+${Math.round(val)}` : Math.round(val)}
                       </span>
                     </div>
@@ -149,8 +153,8 @@ export const PadsPlayer: React.FC = () => {
 
       <div className="grid grid-cols-4 grid-rows-3 gap-2 flex-1 relative mt-1">
         {editMode && (
-           <div className="absolute inset-0 z-20 pointer-events-none rounded-2xl border-2 border-dashed border-red-500/50 bg-red-500/5 flex items-center justify-center backdrop-blur-[2px]">
-              <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-red-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full z-30 shadow-[0_0_20px_rgba(239,68,68,0.5)] tracking-widest uppercase">
+           <div className="absolute inset-0 z-20 pointer-events-none rounded-2xl border-2 border-dashed border-red-500/40 bg-[#FF3B30]/5 flex items-center justify-center backdrop-blur-[1px]">
+              <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#FF3B30] text-white text-[9px] font-black px-3.5 py-1.5 rounded-full z-30 shadow-[0_0_20px_rgba(255,59,48,0.4)] tracking-[0.2em] uppercase">
                 Modo de Edição
               </span>
            </div>
@@ -159,20 +163,22 @@ export const PadsPlayer: React.FC = () => {
           const isActive = activePadKey === note;
           const hasCustom = customPads[note];
           return (
-            <button
+            <motion.button
                key={note}
                onClick={() => handlePadClick(note, freq)}
+               whileHover={{ scale: editMode ? 1 : 1.02, y: editMode ? 0 : -1 }}
+               whileTap={{ scale: 0.95 }}
                className={cn(
-                 "relative flex items-center justify-center rounded-xl border transition-all duration-300 overflow-hidden group",
-                 editMode ? "hover:border-red-500 z-30 pointer-events-auto" : "hover:border-white/20",
+                 "relative flex items-center justify-center rounded-2xl border transition-all duration-300 overflow-hidden group py-4",
+                 editMode ? "hover:border-red-500 z-30 pointer-events-auto" : "hover:border-white/15",
                  isActive && !editMode
-                   ? "bg-gradient-to-b from-[#00A3FF]/20 to-[#00A3FF]/5 border-[#00A3FF]/50 shadow-[0_0_20px_rgba(0,163,255,0.15)]" 
-                   : "bg-[#141415] border-white/5 shadow-inner"
+                   ? "ios-glass-accent border-[#00A3FF]/40 shadow-[0_8px_20px_rgba(0,163,255,0.2)] ring-1 ring-[#00A3FF]/20" 
+                   : "bg-black/30 border-white/5 hover:bg-white/5"
                )}
             >
               <span className={cn(
-                "text-sm font-black z-10 transition-all tracking-wider drop-shadow-sm",
-                isActive && !editMode ? "text-[#00A3FF] scale-110" : "text-white/40 group-hover:text-white/80 group-hover:scale-105"
+                "text-xs font-black z-10 transition-all tracking-wider drop-shadow-sm font-sans",
+                isActive && !editMode ? "text-[#00A3FF] scale-110 font-black" : "text-white/35 group-hover:text-white/80"
               )}>
                 {note}
               </span>
@@ -190,17 +196,17 @@ export const PadsPlayer: React.FC = () => {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="absolute inset-0 flex items-end justify-center pb-3"
+                    className="absolute inset-0 flex items-end justify-center pb-2.5"
                   >
                     <motion.div 
-                      animate={{ scale: [1, 1.5, 1], opacity: [0.6, 1, 0.6] }}
-                      transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                      className="w-1.5 h-1.5 bg-[#00A3FF] rounded-full shadow-[0_0_12px_#00A3FF]"
+                      animate={{ scale: [1, 1.4, 1], opacity: [0.5, 1, 0.5] }}
+                      transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+                      className="w-1.5 h-1.5 bg-[#00A3FF] rounded-full shadow-[0_0_10px_#00A3FF]"
                     />
                   </motion.div>
                 )}
               </AnimatePresence>
-            </button>
+            </motion.button>
           );
         })}
       </div>

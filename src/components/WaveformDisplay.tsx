@@ -45,12 +45,12 @@ export const WaveformDisplay: React.FC = () => {
   const renderPeaks = currentSong.waveformPeaks || Array.from({ length: 120 }).map(() => 0);
 
   return (
-    <div className="h-48 md:h-56 bg-[#050505]/40 backdrop-blur-md relative overflow-hidden border-b border-white/5 group flex-shrink-0">
+    <div className="h-44 md:h-52 bg-white/5 backdrop-blur-md relative overflow-hidden border-b border-white/10 group flex-shrink-0">
       {/* Background Grid */}
-      <div className="absolute inset-0 opacity-10 pointer-events-none" 
+      <div className="absolute inset-0 opacity-[0.03] pointer-events-none" 
         style={{ 
           backgroundImage: 'linear-gradient(to right, #ffffff 1px, transparent 1px), linear-gradient(to bottom, #ffffff 1px, transparent 1px)',
-          backgroundSize: '40px 40px'
+          backgroundSize: '36px 36px'
         }} 
       />
 
@@ -69,15 +69,15 @@ export const WaveformDisplay: React.FC = () => {
             }}
           >
             <div 
-              className="flex items-center gap-2 px-2 py-1 rounded-lg border backdrop-blur-md shadow-lg"
+              className="flex items-center gap-2 px-2.5 py-1 rounded-[10px] border backdrop-blur-xl shadow-lg font-sans"
               style={{ 
-                backgroundColor: `${marker.color}15`, 
-                borderColor: `${marker.color}40`,
+                backgroundColor: `${marker.color}20`, 
+                borderColor: `${marker.color}50`,
                 color: marker.color 
               }}
             >
-              <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: marker.color }} />
-              <span className="text-[10px] font-black uppercase tracking-widest hidden md:inline">
+              <div className="w-1.5 h-1.5 rounded-full ring-2 ring-white/10" style={{ backgroundColor: marker.color }} />
+              <span className="text-[9px] font-black uppercase tracking-widest hidden md:inline">
                 {marker.label}
               </span>
             </div>
@@ -101,9 +101,9 @@ export const WaveformDisplay: React.FC = () => {
               className="w-[2px] md:w-1 rounded-full transition-all duration-300"
               animate={{ 
                 height: height > 0 ? `${Math.max(5, height)}%` : '2px',
-                backgroundColor: isPlayed ? '#00A3FF' : '#1A1A1B',
-                boxShadow: isPlayed ? '0 0 10px rgba(0, 163, 255, 0.4)' : 'none',
-                opacity: isPlayed ? 1 : 0.6
+                backgroundColor: isPlayed ? '#00A3FF' : '#2C2C2E',
+                boxShadow: isPlayed ? '0 0 12px rgba(0, 163, 255, 0.45)' : 'none',
+                opacity: isPlayed ? 1 : 0.4
               }}
             />
           );
@@ -112,21 +112,21 @@ export const WaveformDisplay: React.FC = () => {
 
       {/* Playhead */}
       <motion.div
-        className="absolute top-0 bottom-0 w-[2px] bg-white z-30 pointer-events-none shadow-[0_0_20px_rgba(255,255,255,0.5)]"
+        className="absolute top-0 bottom-0 w-[2px] bg-white z-30 pointer-events-none shadow-[0_0_20px_rgba(255,255,255,0.6)]"
         animate={{ left: `${playheadPosition}%` }}
         transition={{ duration: 0, ease: "linear" }}
       >
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-4 h-4 bg-white rounded-full border-4 border-[#00A3FF] shadow-lg hidden md:block" />
-        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-4 bg-white rounded-full border-4 border-[#00A3FF] shadow-lg" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-white rounded-full border-[3.5px] border-[#00A3FF] shadow-lg hidden md:block" />
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-white rounded-full border-[3.5px] border-[#00A3FF] shadow-lg" />
       </motion.div>
 
       {/* Time Display Overlay */}
-      <div className="absolute bottom-4 md:bottom-6 left-4 md:left-8 z-40 flex items-center gap-4">
-        <div className="bg-white/5 backdrop-blur-xl px-3 md:px-4 py-1.5 md:py-2 rounded-2xl border border-white/10 flex items-baseline gap-2 shadow-2xl">
-          <span className="text-white font-black text-xl md:text-2xl tracking-tighter tabular-nums">
+      <div className="absolute bottom-3 md:bottom-4 left-4 md:left-8 z-40 flex items-center gap-3">
+        <div className="ios-glass-accent backdrop-blur-2xl px-3 md:px-4 py-1.5 md:py-2 rounded-2xl border border-white/10 flex items-baseline gap-2 shadow-xl">
+          <span className="text-white font-black text-lg md:text-xl tracking-wider tabular-nums font-mono">
             {Math.floor(currentTime / 60)}:{(Math.floor(currentTime) % 60).toString().padStart(2, '0')}
           </span>
-          <span className="text-white/20 font-black text-xs md:text-sm tracking-widest uppercase hidden md:inline">
+          <span className="text-white/30 font-extrabold text-[10px] md:text-xs tracking-widest uppercase hidden md:inline font-mono">
             / {Math.floor(currentSong.duration / 60)}:{Math.floor(currentSong.duration % 60).toString().padStart(2, '0')}
           </span>
         </div>
@@ -135,7 +135,7 @@ export const WaveformDisplay: React.FC = () => {
         {isPlaying && (
           <motion.div 
             animate={{ 
-              scale: [1, 1.2, 1],
+              scale: [1, 1.25, 1],
               opacity: [0.3, 1, 0.3]
             }}
             transition={{ 

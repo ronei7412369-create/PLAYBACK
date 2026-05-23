@@ -99,32 +99,32 @@ export const Sidebar: React.FC = () => {
   };
 
   return (
-    <aside className="w-[85vw] max-w-[320px] bg-[#0A0A0B]/60 backdrop-blur-md border-r border-white/5 flex flex-col h-full overflow-hidden relative">
-      <div className="p-8 border-b border-white/5 flex items-center justify-between bg-gradient-to-b from-white/5 to-transparent">
+    <aside className="w-[85vw] max-w-[320px] ios-glass border-r border-white/10 flex flex-col h-full overflow-hidden relative shadow-2xl shrink-0">
+      <div className="p-6 border-b border-white/10 flex items-center justify-between bg-gradient-to-b from-white/5 to-transparent">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-[#00A3FF]/10 rounded-lg flex items-center justify-center">
-            <ListMusic size={18} className="text-[#00A3FF]" />
+          <div className="w-8 h-8 bg-[#00A3FF]/15 border border-[#00A3FF]/20 rounded-xl flex items-center justify-center shadow-lg shadow-[#00A3FF]/10 animate-pulse">
+            <ListMusic size={15} className="text-[#00A3FF]" />
           </div>
-          <h2 className="text-white font-black uppercase tracking-[0.15em] text-xs">Setlist</h2>
+          <h2 className="text-white font-extrabold uppercase tracking-[0.2em] text-[10px]">Setlist</h2>
         </div>
         <div className="flex items-center gap-2">
           <button 
             onClick={() => setShowTelegramModal(true)}
             disabled={isImporting}
             title="Importar do Telegram"
-            className="p-2 bg-[#0088CC]/10 rounded-xl text-[#0088CC] hover:bg-[#0088CC]/20 transition-all border border-[#0088CC]/20"
+            className="p-2.5 bg-[#0088CC]/15 rounded-xl text-[#26A5E4] hover:bg-[#0088CC]/25 transition-all border border-[#0088CC]/30 hover:shadow-[0_0_12px_rgba(38,165,228,0.2)]"
           >
-            <MessageCircle size={18} />
+            <MessageCircle size={15} />
           </button>
           <button 
             onClick={() => fileInputRef.current?.click()}
             disabled={isImporting}
             className={cn(
-              "p-2 bg-white/5 rounded-xl text-white/40 hover:text-[#00A3FF] hover:bg-[#00A3FF]/10 transition-all border border-white/5",
+              "p-2.5 bg-white/5 rounded-xl text-white/40 hover:text-[#00A3FF] hover:bg-[#00A3FF]/15 transition-all border border-white/10 hover:border-[#001D3D]/30",
               isImporting && "opacity-50 cursor-not-allowed"
             )}
           >
-            {isImporting ? <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}><Upload size={18} /></motion.div> : <Plus size={18} />}
+            {isImporting ? <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}><Upload size={15} /></motion.div> : <Plus size={15} />}
           </button>
         </div>
         <input 
@@ -137,38 +137,38 @@ export const Sidebar: React.FC = () => {
         />
       </div>
 
-      <div className="flex-1 overflow-y-auto w-full custom-scrollbar">
-         <PlayList />
-      </div>
+       <div className="flex-1 overflow-y-auto w-full custom-scrollbar">
+          <PlayList />
+       </div>
 
-      <div className="p-8 bg-[#050505]/40 backdrop-blur-md border-t border-white/5 relative overflow-hidden">
+      <div className="p-6 bg-black/40 backdrop-blur-md border-t border-white/10 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[#00A3FF]/20 to-transparent" />
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-5">
           <div className="flex flex-col">
-            <span className="text-[10px] text-white/20 uppercase font-black tracking-widest">Set Duration</span>
-            <span className="text-white font-black text-xl tracking-tighter">04:00:00</span>
+            <span className="text-[9px] text-white/30 uppercase font-black tracking-[0.2em]">Set Duration</span>
+            <span className="text-white font-black text-xl tracking-tighter tabular-nums mt-0.5">04:00:00</span>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center">
-            <Clock size={20} className="text-white/20" />
+          <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/5 flex items-center justify-center shadow-inner">
+            <Clock size={16} className="text-white/30" />
           </div>
         </div>
         <div className="flex gap-2">
           <motion.button 
             onClick={() => setShowSetlistModal(true)}
-            whileTap={{ scale: 0.98 }}
-            className="flex-1 py-4 bg-white/5 text-white rounded-2xl font-black text-xs uppercase tracking-[0.1em] hover:bg-white/10 hover:border-white/20 transition-all border border-white/5 flex items-center justify-center gap-2 group"
+            whileTap={{ scale: 0.96 }}
+            className="flex-1 py-3 bg-white/5 text-white/90 rounded-2xl font-extrabold text-[10px] uppercase tracking-[0.15em] hover:bg-white/10 hover:text-white hover:border-white/25 transition-all border border-white/10 flex items-center justify-center gap-2 shadow-lg"
           >
-            <ListMusic size={16} />
+            <ListMusic size={14} className="text-[#00A3FF]" />
             Setlists
           </motion.button>
           
           <motion.button 
             onClick={() => clearSetlist()}
-            whileTap={{ scale: 0.98 }}
+            whileTap={{ scale: 0.96 }}
             title="Limpar Setlist"
-            className="w-14 py-4 bg-white/5 text-white/40 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/20 transition-all border border-white/5 flex items-center justify-center group"
+            className="w-12 py-3 bg-white/5 text-white/40 rounded-2xl font-extrabold text-[10px] uppercase tracking-[0.15em] hover:bg-[#FF3B30]/15 hover:text-[#FF3B30] hover:border-[#FF3B30]/35 transition-all border border-white/10 flex items-center justify-center group"
           >
-            <Trash2 size={16} className="group-hover:animate-bounce" />
+            <Trash2 size={14} className="group-hover:rotate-12 transition-transform" />
           </motion.button>
         </div>
       </div>

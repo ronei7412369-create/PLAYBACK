@@ -1,7 +1,12 @@
+import { db, storage, auth } from './firebase';
+import { collection, doc, setDoc, getDocs, deleteDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getBytes, deleteObject } from 'firebase/storage';
+
 export class StorageEngine {
   private dbName = 'PrimeMultitrackDB';
   private dbVersion = 2;
   private db: IDBDatabase | null = null;
+  private syncing = false;
 
   async init(): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -32,10 +37,44 @@ export class StorageEngine {
     });
   }
 
+  async syncFromCloud(): Promise<void> {
+    if (!this.db) await this.init();
+    if (!auth.currentUser || this.syncing) return;
+    this.syncing = true;
+    
+    try {
+      const userId = auth.currentUser.uid;
+      
+      // Sync Songs
+      const songsSnapshot = await getDocs(collection(db, 'users', userId, 'songs'));
+      const songs = songsSnapshot.docs.map(doc => doc.data());
+      
+      // Sync Setlists
+      const setlistsSnapshot = await getDocs(collection(db, 'users', userId, 'setlists'));
+      const setlists = setlistsSnapshot.docs.map(doc => doc.data());
+
+      await new Promise<void>((resolve, reject) => {
+        const transaction = this.db!.transaction(['songs', 'setlists'], 'readwrite');
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = (err) => reject(err);
+        
+        const songStore = transaction.objectStore('songs');
+        songs.forEach(song => songStore.put(song));
+        
+        const setlistStore = transaction.objectStore('setlists');
+        setlists.forEach(setlist => setlistStore.put(setlist));
+      });
+    } catch (err) {
+      console.error("Error syncing from cloud:", err);
+    } finally {
+      this.syncing = false;
+    }
+  }
+
   async saveSong(song: any, stemsData: { id: string, buffer: ArrayBuffer }[]): Promise<void> {
     if (!this.db) await this.init();
     
-    return new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const transaction = this.db!.transaction(['songs', 'stems'], 'readwrite');
       
       transaction.oncomplete = () => resolve();
@@ -49,6 +88,18 @@ export class StorageEngine {
         stemStore.put(stem);
       });
     });
+
+    if (auth.currentUser) {
+      const userId = auth.currentUser.uid;
+      // Save metadata
+      setDoc(doc(db, 'users', userId, 'songs', song.id), song).catch(console.error);
+      
+      // Save stems
+      stemsData.forEach(stem => {
+        const fileRef = ref(storage, `users/${userId}/stems/${stem.id}`);
+        uploadBytes(fileRef, stem.buffer).catch(console.error);
+      });
+    }
   }
 
   async loadSongs(): Promise<any[]> {
@@ -67,7 +118,7 @@ export class StorageEngine {
   async loadStemBuffer(id: string): Promise<ArrayBuffer | null> {
     if (!this.db) await this.init();
     
-    return new Promise((resolve, reject) => {
+    let buffer: ArrayBuffer | null = await new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['stems'], 'readonly');
       const store = transaction.objectStore('stems');
       const request = store.get(id);
@@ -75,6 +126,23 @@ export class StorageEngine {
       request.onsuccess = () => resolve(request.result ? request.result.buffer : null);
       request.onerror = (err) => reject(err);
     });
+
+    if (!buffer && auth.currentUser) {
+      try {
+        const fileRef = ref(storage, `users/${auth.currentUser.uid}/stems/${id}`);
+        buffer = await getBytes(fileRef);
+        
+        if (buffer) {
+          const transaction = this.db!.transaction(['stems'], 'readwrite');
+          transaction.objectStore('stems').put({ id, buffer });
+        }
+      } catch (err) {
+         // Might not exist or network issue
+         console.warn("Stem not found in cloud either", id);
+      }
+    }
+    
+    return buffer;
   }
 
   async savePadBuffer(note: string, buffer: ArrayBuffer): Promise<void> {
@@ -125,22 +193,32 @@ export class StorageEngine {
 
   async saveSetlist(setlist: { id: string, name: string, songIds: string[] }): Promise<void> {
     if (!this.db) await this.init();
-    return new Promise((resolve, reject) => {
+    
+    await new Promise<void>((resolve, reject) => {
       const transaction = this.db!.transaction(['setlists'], 'readwrite');
       transaction.oncomplete = () => resolve();
       transaction.onerror = (err) => reject(err);
       transaction.objectStore('setlists').put(setlist);
     });
+
+    if (auth.currentUser) {
+      setDoc(doc(db, 'users', auth.currentUser.uid, 'setlists', setlist.id), setlist).catch(console.error);
+    }
   }
 
   async deleteSetlist(id: string): Promise<void> {
     if (!this.db) await this.init();
-    return new Promise((resolve, reject) => {
+    
+    await new Promise<void>((resolve, reject) => {
       const transaction = this.db!.transaction(['setlists'], 'readwrite');
       transaction.oncomplete = () => resolve();
       transaction.onerror = (err) => reject(err);
       transaction.objectStore('setlists').delete(id);
     });
+
+    if (auth.currentUser) {
+      deleteDoc(doc(db, 'users', auth.currentUser.uid, 'setlists', id)).catch(console.error);
+    }
   }
 
   async clearAll(): Promise<void> {

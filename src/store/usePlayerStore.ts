@@ -20,13 +20,32 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
       return;
     }
 
+    const doSync = async () => {
+      await storageEngine.syncFromCloud();
+      const [savedSongs, savedSetlists] = await Promise.all([
+        storageEngine.loadSongs(),
+        storageEngine.loadSetlists().catch(() => [])
+      ]);
+      const newState: any = {};
+      if (savedSongs && savedSongs.length > 0) {
+        newState.setlist = savedSongs;
+      }
+      if (savedSetlists && savedSetlists.length > 0) {
+        newState.savedSetlists = savedSetlists;
+      }
+      if (Object.keys(newState).length > 0) {
+        set(newState);
+      }
+    };
+
     if (isAdmin) {
       set({ isAuthenticated: true, user, isAdmin, hasAccess: true });
+      doSync();
       return;
     }
 
     // Use onSnapshot to immediately catch document creation and subsequent admin changes
-    onSnapshot(doc(db, 'users', user.uid), (userDoc) => {
+    onSnapshot(doc(db, 'users', user.uid), async (userDoc) => {
       let hasAccess = false;
       if (userDoc.exists()) {
         const data = userDoc.data();
@@ -42,7 +61,6 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
             }
           } catch (e) {
             console.error("Error parsing date", e);
-            // Fallback for when data is written locally (Date object) before becoming a Timestamp
             if (data.trialEndsAt instanceof Date && new Date() < data.trialEndsAt) {
               hasAccess = true;
             }
@@ -50,6 +68,7 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
         }
       }
       set({ isAuthenticated: true, user, isAdmin, hasAccess });
+      doSync();
     }, (error) => {
       console.error("Error listening to user access data", error);
       // In case of permission errors while doc is created, we don't grant default access.
