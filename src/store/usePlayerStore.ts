@@ -90,9 +90,10 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
   padEq: { low: 0, mid: 0, high: 0 },
   customPads: {},
   currentSong: null,
+  globalBpm: 120,
   isPlaying: false,
   currentTime: 0,
-  masterVolume: 1.0,
+  masterVolume: 0.5,
   masterEq: { low: 0, mid: 0, high: 0 },
   isLooping: false,
   isInfiniteLoop: false,
@@ -243,6 +244,17 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
              audioEngine.setStemEQ(stem.id, 'mid', stem.eq.mid);
              audioEngine.setStemEQ(stem.id, 'high', stem.eq.high);
            }
+           if (stem.compressor) {
+             audioEngine.setStemCompressor(
+               stem.id,
+               stem.compressor.enabled,
+               stem.compressor.threshold,
+               stem.compressor.ratio,
+               stem.compressor.attack,
+               stem.compressor.release,
+               stem.compressor.makeupGain
+             );
+           }
          }
        }
     } catch (e) {
@@ -345,15 +357,20 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
   },
 
   toggleMetronome: () => {
-    const { metronomeEnabled, currentSong } = get();
+    const { metronomeEnabled, currentSong, globalBpm } = get();
     const newState = !metronomeEnabled;
-    audioEngine.toggleMetronome(newState, currentSong?.bpm || 120, currentSong?.timeSignature || "4/4");
+    audioEngine.toggleMetronome(newState, currentSong?.bpm || globalBpm || 120, currentSong?.timeSignature || "4/4");
     set({ metronomeEnabled: newState });
   },
 
   updateBpm: (delta: number) => {
-    const { currentSong, setlist } = get();
-    if (!currentSong) return;
+    const { currentSong, setlist, globalBpm } = get();
+    if (!currentSong) {
+      const newBpm = Math.max(30, Math.min(globalBpm + delta, 300));
+      audioEngine.updateMetronomeParams(newBpm, "4/4");
+      set({ globalBpm: newBpm });
+      return;
+    }
 
     const newBpm = Math.max(30, Math.min(currentSong.bpm + delta, 300));
     const timeSig = currentSong.timeSignature || "4/4";
@@ -364,7 +381,7 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
     const newSetlist = setlist.map(s => s.id === updatedSong.id ? updatedSong : s);
     storageEngine.saveSong(updatedSong, []);
     
-    set({ currentSong: updatedSong, setlist: newSetlist });
+    set({ currentSong: updatedSong, setlist: newSetlist, globalBpm: newBpm });
   },
 
   tapTempo: () => {
@@ -389,7 +406,7 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
       // Clamp reasonable BPM
       newBpm = Math.max(30, Math.min(newBpm, 300));
       
-      const { currentSong, metronomeEnabled, setlist } = get();
+      const { currentSong, setlist } = get();
       if (currentSong) {
         const timeSig = currentSong.timeSignature || "4/4";
         audioEngine.updateMetronomeParams(newBpm, timeSig);
@@ -398,7 +415,10 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
         const newSetlist = setlist.map(s => s.id === updatedSong.id ? updatedSong : s);
         storageEngine.saveSong(updatedSong, []);
         
-        set({ currentSong: updatedSong, setlist: newSetlist });
+        set({ currentSong: updatedSong, setlist: newSetlist, globalBpm: newBpm });
+      } else {
+        audioEngine.updateMetronomeParams(newBpm, "4/4");
+        set({ globalBpm: newBpm });
       }
     }
     
@@ -460,6 +480,34 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
         stems: state.currentSong.stems.map(s => s.id === stemId ? { ...s, volume } : s)
       } : null
     }));
+  },
+  
+  resetAllVolumesToZeroDb: () => {
+    audioEngine.setMasterVolume(0.5);
+    audioEngine.setPadVolume(0.5);
+    
+    const { currentSong } = get();
+    if (currentSong) {
+      currentSong.stems.forEach(stem => {
+        if (!stem.isMuted) {
+          audioEngine.setStemVolume(stem.id, 0.5);
+        }
+      });
+      
+      set((state) => ({
+        masterVolume: 0.5,
+        padVolume: 0.5,
+        currentSong: state.currentSong ? {
+          ...state.currentSong,
+          stems: state.currentSong.stems.map(s => ({ ...s, volume: 0.5 }))
+        } : null
+      }));
+    } else {
+      set({
+        masterVolume: 0.5,
+        padVolume: 0.5
+      });
+    }
   },
   
   toggleStemMute: (stemId) => {
@@ -566,6 +614,21 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
         ...state.currentSong,
         stems: state.currentSong.stems.map(s => 
           s.id === stemId ? { ...s, eq: { ...(s.eq || { low: 0, mid: 0, high: 0 }), [band]: value } } : s
+        )
+      } : null
+    }));
+  },
+
+  setStemCompressor: (stemId, enabled, threshold, ratio, attack, release, makeupGain) => {
+    audioEngine.setStemCompressor(stemId, enabled, threshold, ratio, attack, release, makeupGain);
+    set((state) => ({
+      currentSong: state.currentSong ? {
+        ...state.currentSong,
+        stems: state.currentSong.stems.map(s => 
+          s.id === stemId ? { 
+            ...s, 
+            compressor: { enabled, threshold, ratio, attack, release, makeupGain } 
+          } : s
         )
       } : null
     }));

@@ -136,10 +136,10 @@ export const StemSplitter: React.FC = () => {
         title: selectedFile.name.replace(/\.[^/.]+$/, ""),
         artist: 'AI Processed',
         stems: [
-          { id: `${songId}-vocals`, name: 'Vocals', file: vocalsData.url, originalFile: vocalsData.file, output: 3, pan: 0, volume: 1, isMuted: false, isSoloed: false },
-          { id: `${songId}-drums`, name: 'Drums', file: drumsData.url, originalFile: drumsData.file, output: 3, pan: 0, volume: 1, isMuted: false, isSoloed: false },
-          { id: `${songId}-bass`, name: 'Bass', file: bassData.url, originalFile: bassData.file, output: 3, pan: 0, volume: 1, isMuted: false, isSoloed: false },
-          { id: `${songId}-other`, name: 'Instruments', file: otherData.url, originalFile: otherData.file, output: 3, pan: 0, volume: 1, isMuted: false, isSoloed: false },
+          { id: `${songId}-vocals`, name: 'Vocals', file: vocalsData.url, originalFile: vocalsData.file, output: 3, pan: 0, volume: 0.5, isMuted: false, isSoloed: false },
+          { id: `${songId}-drums`, name: 'Drums', file: drumsData.url, originalFile: drumsData.file, output: 3, pan: 0, volume: 0.5, isMuted: false, isSoloed: false },
+          { id: `${songId}-bass`, name: 'Bass', file: bassData.url, originalFile: bassData.file, output: 3, pan: 0, volume: 0.5, isMuted: false, isSoloed: false },
+          { id: `${songId}-other`, name: 'Instruments', file: otherData.url, originalFile: otherData.file, output: 3, pan: 0, volume: 0.5, isMuted: false, isSoloed: false },
         ]
       });
 

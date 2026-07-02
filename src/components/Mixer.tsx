@@ -6,6 +6,7 @@ import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { Settings, X, Volume2, VolumeX, Headphones, SlidersHorizontal, Activity } from 'lucide-react';
 import { audioEngine } from '../services/audioEngine';
+import { handleMidiRightClick } from '../store/useMidiStore';
 
 interface ChannelStripProps {
   stem: Stem;
@@ -157,13 +158,20 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({ stem, index, onOpenDetails 
           <div className="absolute top-0 bottom-0 w-1 sm:w-1.5 bg-black/60 rounded-full border border-white/5 shadow-inner" />
           
           {/* Fader Tick Marks */}
-          <div className="absolute top-0 bottom-0 left-4 sm:left-6 md:left-8 flex flex-col justify-between py-1 pointer-events-none opacity-15">
-            {[0, 1, 2, 3, 4].map(i => (
-              <div key={i} className="flex items-center gap-1">
-                <div className="w-1.5 md:w-2 h-[1px] bg-white" />
-                {i === 0 && <span className="text-[6px] md:text-[7px] font-extrabold text-white absolute -right-2 md:-right-3 top-[-3px] hidden sm:block">0dB</span>}
-              </div>
-            ))}
+          <div className="absolute top-0 bottom-0 left-4 sm:left-6 md:left-8 flex flex-col justify-between py-1 pointer-events-none">
+            {[0, 1, 2, 3, 4].map(i => {
+              const isZeroDb = i === 2;
+              return (
+                <div key={i} className="flex items-center gap-1 relative">
+                  <div className={cn("w-1.5 md:w-2 h-[1px]", isZeroDb ? "bg-[#2ECC71] w-2.5 md:w-3.5 h-[1.5px] shadow-[0_0_8px_#2ECC71]" : "bg-white opacity-20")} />
+                  {isZeroDb && (
+                    <span className="text-[6px] md:text-[7px] font-black text-[#2ECC71] absolute -right-2 md:-right-3 top-[-3.5px] hidden sm:block drop-shadow-[0_0_3px_rgba(46,204,113,0.4)]">
+                      0dB
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           <input
@@ -174,6 +182,7 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({ stem, index, onOpenDetails 
             value={stem.volume}
             onChange={(e) => updateStemVolume(stem.id, parseFloat(e.target.value))}
             onClick={(e) => e.stopPropagation()}
+            onContextMenu={(e) => handleMidiRightClick(e, 'stem_volume', `Volume ${stem.name}`, stem.name)}
             className="absolute top-0 bottom-0 left-0 w-full opacity-0 cursor-pointer z-20 [writing-mode:bt-lr] [appearance:slider-vertical]"
           />
 
@@ -201,6 +210,7 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({ stem, index, onOpenDetails 
          <div className="flex gap-1 w-full h-8">
             <button
                onClick={() => toggleStemMute(stem.id)}
+               onContextMenu={(e) => handleMidiRightClick(e, 'stem_mute', `Mute ${stem.name}`, stem.name)}
                className={cn(
                  "flex-1 rounded-lg flex items-center justify-center transition-all border border-transparent text-[10px]",
                  stem.isMuted ? "bg-[#FF3B30] text-white border-[#FF3B30]/30 shadow-[0_0_12px_rgba(255,59,48,0.35)]" : "bg-white/5 text-white/40 hover:bg-white/10 hover:text-white"
@@ -210,6 +220,7 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({ stem, index, onOpenDetails 
             </button>
             <button
                onClick={() => toggleStemSolo(stem.id)}
+               onContextMenu={(e) => handleMidiRightClick(e, 'stem_solo', `Solo ${stem.name}`, stem.name)}
                className={cn(
                  "flex-1 rounded-lg flex items-center justify-center transition-all border border-transparent text-[10px]",
                  stem.isSoloed ? "bg-[#FFD60A] text-black border-[#FFD60A]/30 shadow-[0_0_12px_rgba(255,214,10,0.35)]" : "bg-white/5 text-white/40 hover:bg-white/10 hover:text-white"
@@ -224,8 +235,62 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({ stem, index, onOpenDetails 
 };
 
 const TrackDetailsModal: React.FC<{ stem: Stem, index: number, onClose: () => void }> = ({ stem, index, onClose }) => {
-  const { updateStemVolume, toggleStemMute, toggleStemSolo, setStemOutput, setStemEQ } = usePlayerStore();
+  const { updateStemVolume, toggleStemMute, toggleStemSolo, setStemOutput, setStemEQ, setStemCompressor } = usePlayerStore();
   const trackColor = TRACK_COLORS[index % TRACK_COLORS.length];
+
+  const compressor = stem.compressor || {
+    enabled: false,
+    threshold: -24,
+    ratio: 12,
+    attack: 0.003,
+    release: 0.25,
+    makeupGain: 0
+  };
+
+  const toggleCompressor = () => {
+    setStemCompressor(
+      stem.id,
+      !compressor.enabled,
+      compressor.threshold,
+      compressor.ratio,
+      compressor.attack,
+      compressor.release,
+      compressor.makeupGain
+    );
+  };
+
+  const applyPreset = (presetName: string) => {
+    let enabled = true;
+    let threshold = -24;
+    let ratio = 12;
+    let attack = 0.003;
+    let release = 0.25;
+    let makeupGain = 0;
+
+    if (presetName === 'bypass') {
+      enabled = false;
+    } else if (presetName === 'vocal') {
+      threshold = -18;
+      ratio = 3;
+      attack = 0.01;
+      release = 0.15;
+      makeupGain = 3;
+    } else if (presetName === 'punch') {
+      threshold = -25;
+      ratio = 6;
+      attack = 0.005;
+      release = 0.08;
+      makeupGain = 5;
+    } else if (presetName === 'master') {
+      threshold = -12;
+      ratio = 2.0;
+      attack = 0.03;
+      release = 0.25;
+      makeupGain = 6;
+    }
+
+    setStemCompressor(stem.id, enabled, threshold, ratio, attack, release, makeupGain);
+  };
 
   return createPortal(
     <motion.div
@@ -240,7 +305,7 @@ const TrackDetailsModal: React.FC<{ stem: Stem, index: number, onClose: () => vo
         animate={{ y: 0, scale: 1 }}
         exit={{ y: "100%", scale: 0.95 }}
         transition={{ type: "spring", damping: 26, stiffness: 320 }}
-        className="w-full sm:w-[500px] max-w-full ios-glass border-t sm:border border-white/15 rounded-t-[2rem] sm:rounded-[2.25rem] shadow-2xl overflow-hidden"
+        className="w-full sm:w-[760px] max-w-full ios-glass border-t sm:border border-white/15 rounded-t-[2rem] sm:rounded-[2.25rem] shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
           {/* Header */}
@@ -264,8 +329,8 @@ const TrackDetailsModal: React.FC<{ stem: Stem, index: number, onClose: () => vo
 
           <div className="p-5 flex flex-col sm:flex-row gap-5 overflow-y-auto max-h-[80vh]">
             
-            {/* Primary Controls */}
-            <div className="flex flex-col gap-4 w-full sm:w-1/2">
+            {/* Column 1: Primary Controls */}
+            <div className="flex flex-col gap-4 w-full sm:w-1/3">
                {/* Fader */}
                <div className="bg-black/40 rounded-2xl p-4 border border-white/5 flex flex-col items-center flex-1">
                   <div className="flex justify-between w-full mb-3">
@@ -275,6 +340,24 @@ const TrackDetailsModal: React.FC<{ stem: Stem, index: number, onClose: () => vo
                   
                   <div className="relative w-full h-44 flex justify-center py-2 shrink-0">
                      <div className="absolute inset-y-0 w-1.5 bg-black/60 rounded-full border border-white/5 shadow-inner" />
+                     
+                     {/* Fader Tick Marks */}
+                     <div className="absolute top-0 bottom-0 left-[35%] flex flex-col justify-between py-1 pointer-events-none">
+                       {[0, 1, 2, 3, 4].map(i => {
+                         const isZeroDb = i === 2;
+                         return (
+                           <div key={i} className="flex items-center gap-1.5 relative">
+                             <div className={cn("w-1.5 md:w-2.5 h-[1px]", isZeroDb ? "bg-[#2ECC71] w-3 md:w-4.5 h-[1.5px] shadow-[0_0_8px_#2ECC71]" : "bg-white opacity-20")} />
+                             {isZeroDb && (
+                               <span className="text-[7px] md:text-[8px] font-black text-[#2ECC71] absolute -right-5 md:-right-6 top-[-4.5px] hidden sm:block drop-shadow-[0_0_2px_rgba(46,204,113,0.4)]">
+                                 0dB
+                               </span>
+                             )}
+                           </div>
+                         );
+                       })}
+                     </div>
+
                      <input
                         type="range"
                         min="0"
@@ -282,6 +365,7 @@ const TrackDetailsModal: React.FC<{ stem: Stem, index: number, onClose: () => vo
                         step="0.01"
                         value={stem.volume}
                         onChange={(e) => updateStemVolume(stem.id, parseFloat(e.target.value))}
+                        onContextMenu={(e) => handleMidiRightClick(e, 'stem_volume', `Volume ${stem.name}`, stem.name)}
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20 [writing-mode:bt-lr] [appearance:slider-vertical]"
                      />
                      <motion.div 
@@ -302,11 +386,12 @@ const TrackDetailsModal: React.FC<{ stem: Stem, index: number, onClose: () => vo
                </div>
             </div>
 
-            {/* Right Column: Buttons & EQ */}
-            <div className="flex flex-col gap-4 w-full sm:w-1/2">
+            {/* Column 2: EQ & Route */}
+            <div className="flex flex-col gap-4 w-full sm:w-1/3">
                <div className="flex gap-3">
                   <button
                      onClick={() => toggleStemMute(stem.id)}
+                     onContextMenu={(e) => handleMidiRightClick(e, 'stem_mute', `Mute ${stem.name}`, stem.name)}
                      className={cn(
                         "flex-1 rounded-2xl py-3 flex flex-col items-center justify-center gap-1.5 transition-all border-2 text-[10px]",
                         stem.isMuted 
@@ -320,6 +405,7 @@ const TrackDetailsModal: React.FC<{ stem: Stem, index: number, onClose: () => vo
 
                   <button
                      onClick={() => toggleStemSolo(stem.id)}
+                     onContextMenu={(e) => handleMidiRightClick(e, 'stem_solo', `Solo ${stem.name}`, stem.name)}
                      className={cn(
                         "flex-1 rounded-2xl py-3 flex flex-col items-center justify-center gap-1.5 transition-all border-2 text-[10px]",
                         stem.isSoloed 
@@ -372,6 +458,7 @@ const TrackDetailsModal: React.FC<{ stem: Stem, index: number, onClose: () => vo
                                      step="1"
                                      value={value}
                                      onChange={(e) => setStemEQ(stem.id, band as 'high'|'mid'|'low', parseFloat(e.target.value))}
+                                     onContextMenu={(e) => handleMidiRightClick(e, `stem_eq_${band}`, `EQ ${band.toUpperCase()} ${stem.name}`, stem.name)}
                                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20 [writing-mode:bt-lr] [appearance:slider-vertical]"
                                   />
                                </div>
@@ -383,8 +470,250 @@ const TrackDetailsModal: React.FC<{ stem: Stem, index: number, onClose: () => vo
                      })}
                   </div>
                </div>
-
             </div>
+
+            {/* Column 3: Compressor */}
+            <div className="flex flex-col gap-4 w-full sm:w-1/3 bg-black/25 rounded-2xl p-4 border border-white/5">
+                <div className="flex items-center justify-between">
+                   <div className="text-[10px] uppercase font-black tracking-widest" style={{ color: trackColor }}>
+                      Compressor
+                   </div>
+                   <button
+                      onClick={toggleCompressor}
+                      className={cn(
+                         "px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider transition-all border",
+                         compressor.enabled
+                            ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
+                            : "bg-white/5 border-white/10 text-white/40"
+                      )}
+                   >
+                      {compressor.enabled ? "Ativo" : "Bypass"}
+                   </button>
+                </div>
+
+                {/* Presets Grid */}
+                <div className="grid grid-cols-2 gap-1.5">
+                   <button
+                      onClick={() => applyPreset('bypass')}
+                      className={cn(
+                         "py-1.5 rounded-lg text-[9px] font-bold uppercase transition-all border",
+                         !compressor.enabled
+                            ? "bg-white/10 border-white/20 text-white"
+                            : "bg-black/20 border-white/5 text-white/30 hover:border-white/10"
+                      )}
+                   >
+                      Bypass
+                   </button>
+                   <button
+                      onClick={() => applyPreset('vocal')}
+                      className={cn(
+                         "py-1.5 rounded-lg text-[9px] font-bold uppercase transition-all border",
+                         compressor.enabled && compressor.threshold === -18 && compressor.ratio === 3
+                            ? "bg-white/10 border-white/20 text-white"
+                            : "bg-black/20 border-white/5 text-white/30 hover:border-white/10"
+                      )}
+                   >
+                      Vocal
+                   </button>
+                   <button
+                      onClick={() => applyPreset('punch')}
+                      className={cn(
+                         "py-1.5 rounded-lg text-[9px] font-bold uppercase transition-all border",
+                         compressor.enabled && compressor.threshold === -25 && compressor.ratio === 6
+                            ? "bg-white/10 border-white/20 text-white"
+                            : "bg-black/20 border-white/5 text-white/30 hover:border-white/10"
+                      )}
+                   >
+                      Punch
+                   </button>
+                   <button
+                      onClick={() => applyPreset('master')}
+                      className={cn(
+                         "py-1.5 rounded-lg text-[9px] font-bold uppercase transition-all border",
+                         compressor.enabled && compressor.threshold === -12 && compressor.ratio === 2
+                            ? "bg-white/10 border-white/20 text-white"
+                            : "bg-black/20 border-white/5 text-white/30 hover:border-white/10"
+                      )}
+                   >
+                      Master
+                   </button>
+                </div>
+
+                {/* Sliders Container */}
+                <div className="flex flex-col gap-3 flex-1 justify-center">
+                   {/* Threshold */}
+                   <div className="flex flex-col gap-1">
+                      <div className="flex justify-between text-[9px] font-bold uppercase tracking-wider text-white/40">
+                         <span>Threshold</span>
+                         <span className="font-mono text-white/75">{compressor.threshold.toFixed(0)} dB</span>
+                      </div>
+                      <input
+                         type="range"
+                         min="-60"
+                         max="0"
+                         step="1"
+                         disabled={!compressor.enabled}
+                         value={compressor.threshold}
+                         onChange={(e) => setStemCompressor(
+                            stem.id,
+                            compressor.enabled,
+                            parseFloat(e.target.value),
+                            compressor.ratio,
+                            compressor.attack,
+                            compressor.release,
+                            compressor.makeupGain
+                         )}
+                         className={cn(
+                            "w-full h-1.5 rounded-full appearance-none outline-none cursor-pointer transition-opacity",
+                            compressor.enabled ? "bg-white/15" : "bg-white/5 opacity-40 pointer-events-none"
+                         )}
+                         style={{
+                            background: compressor.enabled
+                               ? `linear-gradient(to right, ${trackColor} 0%, ${trackColor} ${((compressor.threshold + 60) / 60) * 100}%, rgba(255,255,255,0.15) ${((compressor.threshold + 60) / 60) * 100}%, rgba(255,255,255,0.15) 100%)`
+                               : undefined
+                         }}
+                      />
+                   </div>
+
+                   {/* Ratio */}
+                   <div className="flex flex-col gap-1">
+                      <div className="flex justify-between text-[9px] font-bold uppercase tracking-wider text-white/40">
+                         <span>Ratio</span>
+                         <span className="font-mono text-white/75">{compressor.ratio.toFixed(1)}:1</span>
+                      </div>
+                      <input
+                         type="range"
+                         min="1"
+                         max="20"
+                         step="0.5"
+                         disabled={!compressor.enabled}
+                         value={compressor.ratio}
+                         onChange={(e) => setStemCompressor(
+                            stem.id,
+                            compressor.enabled,
+                            compressor.threshold,
+                            parseFloat(e.target.value),
+                            compressor.attack,
+                            compressor.release,
+                            compressor.makeupGain
+                         )}
+                         className={cn(
+                            "w-full h-1.5 rounded-full appearance-none outline-none cursor-pointer transition-opacity",
+                            compressor.enabled ? "bg-white/15" : "bg-white/5 opacity-40 pointer-events-none"
+                         )}
+                         style={{
+                            background: compressor.enabled
+                               ? `linear-gradient(to right, ${trackColor} 0%, ${trackColor} ${((compressor.ratio - 1) / 19) * 100}%, rgba(255,255,255,0.15) ${((compressor.ratio - 1) / 19) * 100}%, rgba(255,255,255,0.15) 100%)`
+                               : undefined
+                         }}
+                      />
+                   </div>
+
+                   {/* Attack */}
+                   <div className="flex flex-col gap-1">
+                      <div className="flex justify-between text-[9px] font-bold uppercase tracking-wider text-white/40">
+                         <span>Ataque</span>
+                         <span className="font-mono text-white/75">{(compressor.attack * 1000).toFixed(0)} ms</span>
+                      </div>
+                      <input
+                         type="range"
+                         min="1"
+                         max="500"
+                         step="1"
+                         disabled={!compressor.enabled}
+                         value={compressor.attack * 1000}
+                         onChange={(e) => setStemCompressor(
+                            stem.id,
+                            compressor.enabled,
+                            compressor.threshold,
+                            compressor.ratio,
+                            parseFloat(e.target.value) / 1000,
+                            compressor.release,
+                            compressor.makeupGain
+                         )}
+                         className={cn(
+                            "w-full h-1.5 rounded-full appearance-none outline-none cursor-pointer transition-opacity",
+                            compressor.enabled ? "bg-white/15" : "bg-white/5 opacity-40 pointer-events-none"
+                         )}
+                         style={{
+                            background: compressor.enabled
+                               ? `linear-gradient(to right, ${trackColor} 0%, ${trackColor} ${((compressor.attack * 1000 - 1) / 499) * 100}%, rgba(255,255,255,0.15) ${((compressor.attack * 1000 - 1) / 499) * 100}%, rgba(255,255,255,0.15) 100%)`
+                               : undefined
+                         }}
+                      />
+                   </div>
+
+                   {/* Release */}
+                   <div className="flex flex-col gap-1">
+                      <div className="flex justify-between text-[9px] font-bold uppercase tracking-wider text-white/40">
+                         <span>Release</span>
+                         <span className="font-mono text-white/75">{(compressor.release * 1000).toFixed(0)} ms</span>
+                      </div>
+                      <input
+                         type="range"
+                         min="10"
+                         max="1000"
+                         step="10"
+                         disabled={!compressor.enabled}
+                         value={compressor.release * 1000}
+                         onChange={(e) => setStemCompressor(
+                            stem.id,
+                            compressor.enabled,
+                            compressor.threshold,
+                            compressor.ratio,
+                            compressor.attack,
+                            parseFloat(e.target.value) / 1000,
+                            compressor.makeupGain
+                         )}
+                         className={cn(
+                            "w-full h-1.5 rounded-full appearance-none outline-none cursor-pointer transition-opacity",
+                            compressor.enabled ? "bg-white/15" : "bg-white/5 opacity-40 pointer-events-none"
+                         )}
+                         style={{
+                            background: compressor.enabled
+                               ? `linear-gradient(to right, ${trackColor} 0%, ${trackColor} ${((compressor.release * 1000 - 10) / 990) * 100}%, rgba(255,255,255,0.15) ${((compressor.release * 1000 - 10) / 990) * 100}%, rgba(255,255,255,0.15) 100%)`
+                               : undefined
+                         }}
+                      />
+                   </div>
+
+                   {/* Makeup Gain */}
+                   <div className="flex flex-col gap-1 bg-black/30 p-2 rounded-xl border border-white/5 mt-1">
+                      <div className="flex justify-between text-[9px] font-bold uppercase tracking-wider text-white/40">
+                         <span className="flex items-center gap-1">
+                            Gain Boost
+                         </span>
+                         <span className="font-mono text-emerald-400 font-extrabold">+{compressor.makeupGain.toFixed(1)} dB</span>
+                      </div>
+                      <input
+                         type="range"
+                         min="0"
+                         max="18"
+                         step="0.5"
+                         disabled={!compressor.enabled}
+                         value={compressor.makeupGain}
+                         onChange={(e) => setStemCompressor(
+                            stem.id,
+                            compressor.enabled,
+                            compressor.threshold,
+                            compressor.ratio,
+                            compressor.attack,
+                            compressor.release,
+                            parseFloat(e.target.value)
+                         )}
+                         className={cn(
+                            "w-full h-1.5 rounded-full appearance-none outline-none cursor-pointer transition-opacity",
+                            compressor.enabled ? "bg-white/15" : "bg-white/5 opacity-40 pointer-events-none"
+                         )}
+                         style={{
+                            background: compressor.enabled
+                               ? `linear-gradient(to right, #10B981 0%, #10B981 ${(compressor.makeupGain / 18) * 100}%, rgba(255,255,255,0.15) ${(compressor.makeupGain / 18) * 100}%, rgba(255,255,255,0.15) 100%)`
+                               : undefined
+                         }}
+                      />
+                   </div>
+                </div>
+             </div>
 
           </div>
         </motion.div>
@@ -394,7 +723,7 @@ const TrackDetailsModal: React.FC<{ stem: Stem, index: number, onClose: () => vo
 };
 
 export const Mixer: React.FC = () => {
-  const { currentSong } = usePlayerStore();
+  const { currentSong, resetAllVolumesToZeroDb } = usePlayerStore();
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
 
   if (!currentSong) return null;
@@ -414,6 +743,20 @@ export const Mixer: React.FC = () => {
       {currentSong.stems.map((stem, index) => (
         <ChannelStrip key={stem.id} stem={stem} index={index} onOpenDetails={() => setSelectedTrackId(stem.id)} />
       ))}
+
+      {/* Botão de reset rápido para 0dB */}
+      <div className="flex flex-col items-center justify-center w-16 sm:w-20 md:w-24 shrink-0 h-full border-l border-white/5 bg-white/[0.01] hover:bg-white/[0.03] transition-all p-3 text-center">
+         <span className="text-[8px] md:text-[9.5px] font-black uppercase tracking-widest text-[#2ECC71] drop-shadow-[0_0_4px_rgba(46,204,113,0.3)] mb-3">0dB nominal</span>
+         <button
+           onClick={resetAllVolumesToZeroDb}
+           title="Colocar todos os volumes em 0dB"
+           className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-[#2ECC71]/10 border border-[#2ECC71]/30 hover:bg-[#2ECC71] hover:text-black hover:shadow-[0_0_15px_#2ECC71] text-[#2ECC71] transition-all flex items-center justify-center group"
+         >
+           <Activity size={18} className="group-hover:scale-110 transition-transform animate-pulse" />
+         </button>
+         <span className="text-[8px] md:text-[9.5px] font-bold text-white/40 mt-3 uppercase leading-tight">Resetar<br/>Volumes</span>
+      </div>
+
       <div className="min-w-[40px]" />
 
       <AnimatePresence>

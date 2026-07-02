@@ -153,15 +153,28 @@ export const MidiController: React.FC = () => {
           }
           break;
         case 'ambient_pad':
-           // Pad trigger
-           if (mapping.actionPayload) {
-             // For pads we might want volume or toggle. If note on, maybe trigger if value > 0?
-             // But we don't have direct access to pad freqs easily here without hardcoding.
-             // We can map 'ambient_pad' with actionPayload = note like C, C#, etc.
-             // We'd need a helper to get freq or just let the store find it.
-             // It's mostly toggleAmbientPad(note, freq). We don't have freq...
-             // So maybe we add a triggerPadByNote if we want.
+           if (value > 0 && mapping.actionPayload) {
+             const note = mapping.actionPayload;
+             const PAD_FREQS: Record<string, number> = {
+               'C': 261.63, 'C#': 277.18, 'D': 293.66, 'Eb': 311.13,
+               'E': 329.63, 'F': 349.23, 'F#': 369.99, 'G': 392.00,
+               'Ab': 415.30, 'A': 440.00, 'Bb': 466.16, 'B': 493.88
+             };
+             const freq = PAD_FREQS[note];
+             if (freq) store.toggleAmbientPad(note, freq);
            }
+           break;
+        case 'pad_volume':
+           store.setPadVolume(value / 127);
+           break;
+        case 'pad_eq_low':
+           store.setPadEQ('low', ((value / 127) * 48) - 24);
+           break;
+        case 'pad_eq_mid':
+           store.setPadEQ('mid', ((value / 127) * 48) - 24);
+           break;
+        case 'pad_eq_high':
+           store.setPadEQ('high', ((value / 127) * 48) - 24);
            break;
       }
     };

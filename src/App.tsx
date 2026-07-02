@@ -9,6 +9,7 @@ import { Mixer } from './components/Mixer';
 import { TransportControls } from './components/TransportControls';
 import { LoginScreen } from './components/LoginScreen';
 import { MidiController } from './components/MidiController';
+import { MidiGlobalOverlay } from './components/MidiGlobalOverlay';
 import { MidiMapModal } from './components/MidiMapModal';
 import { cn } from './lib/utils';
 import { Sliders, Type, Grid, Music, Settings2 } from 'lucide-react';
@@ -173,6 +174,7 @@ export default function App() {
   return (
     <div className="flex flex-col h-[100dvh] bg-transparent text-white overflow-hidden font-sans select-none relative">
       <MidiController />
+      <MidiGlobalOverlay />
       <BackgroundAnimation />
       
       <Header />

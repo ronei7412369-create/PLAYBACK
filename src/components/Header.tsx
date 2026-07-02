@@ -8,9 +8,10 @@ import { StemSplitter } from './StemSplitter';
 
 import { MidiMapModal } from './MidiMapModal';
 import { AnimatedLogo } from './AnimatedLogo';
+import { handleMidiRightClick } from '../store/useMidiStore';
 
 export const Header: React.FC = () => {
-  const { currentSong, masterVolume, setMasterVolume, masterEq, setMasterEQ, isPlaying, toggleMetronome, metronomeEnabled, isLRSplit, toggleLRSplit, isStageMode, toggleStageMode, logout, isSidebarOpen, setShowSidebar, tapTempo, updateBpm, cycleTimeSignature, pitchShift, setPitchShift, isAdmin } = usePlayerStore();
+  const { currentSong, globalBpm, masterVolume, setMasterVolume, masterEq, setMasterEQ, isPlaying, toggleMetronome, metronomeEnabled, isLRSplit, toggleLRSplit, isStageMode, toggleStageMode, logout, isSidebarOpen, setShowSidebar, tapTempo, updateBpm, cycleTimeSignature, pitchShift, setPitchShift, isAdmin } = usePlayerStore();
   const [showEq, setShowEq] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [showMidiMap, setShowMidiMap] = useState(false);
@@ -66,10 +67,7 @@ export const Header: React.FC = () => {
           className="flex items-center gap-2 md:gap-3 shrink-0"
         >
           <div className="relative group">
-            <div className="absolute -inset-1 bg-[#00A3FF] rounded-full blur opacity-30 group-hover:opacity-60 transition duration-1000 group-hover:duration-200"></div>
-            <div className="relative bg-black/50 p-1.5 rounded-full border border-white/10">
-              <AnimatedLogo size="sm" />
-            </div>
+            <AnimatedLogo size="sm" />
           </div>
           <div className="flex flex-col hidden sm:flex">
             <span className="text-white font-extrabold text-sm md:text-lg tracking-wider font-sans uppercase">GIG <span className="text-[#00A3FF] drop-shadow-[0_0_10px_rgba(0,163,255,0.4)]">PLAY</span></span>
@@ -110,7 +108,6 @@ export const Header: React.FC = () => {
           <div className="flex items-center gap-1">
              <button 
                onClick={tapTempo}
-               disabled={!currentSong}
                className="hidden sm:block text-[9px] font-extrabold uppercase tracking-[0.2em] text-white/60 hover:text-white bg-white/5 hover:bg-white/10 px-2.5 py-2.5 rounded-xl transition-all border border-white/5 h-full"
                title="Tap Tempo"
              >
@@ -123,13 +120,13 @@ export const Header: React.FC = () => {
                  : "hover:bg-white/5 border border-transparent"
              )}>
                 {metronomeEnabled && <div className="absolute inset-0 bg-[#00A3FF]/10 animate-pulse" />}
-                <button onClick={toggleMetronome} disabled={!currentSong} className={cn("flex items-center justify-center mb-0.5", metronomeEnabled ? "text-[#00A3FF] scale-110" : "text-white/40 hover:text-white transition-all")}>
+                <button onClick={toggleMetronome} className={cn("flex items-center justify-center mb-0.5", metronomeEnabled ? "text-[#00A3FF] scale-110" : "text-white/40 hover:text-white transition-all")}>
                   <Clock size={12} />
                 </button>
                 <div className="flex items-center justify-between w-full h-[18px] gap-1 z-10">
-                   <button onClick={() => updateBpm(-1)} disabled={!currentSong} className="text-white/40 hover:text-white font-black text-xs px-1 leading-none">-</button>
-                   <span className={cn("font-black text-xs md:text-sm tabular-nums tracking-tighter w-8 text-center", metronomeEnabled ? "text-[#00A3FF]" : "text-white")}>{currentSong?.bpm || "120"}</span>
-                   <button onClick={() => updateBpm(1)} disabled={!currentSong} className="text-white/40 hover:text-white font-black text-xs px-1 leading-none">+</button>
+                   <button onClick={() => updateBpm(-1)} className="text-white/40 hover:text-white font-black text-xs px-1 leading-none">-</button>
+                   <span className={cn("font-black text-xs md:text-sm tabular-nums tracking-tighter w-8 text-center", metronomeEnabled ? "text-[#00A3FF]" : "text-white")}>{currentSong?.bpm || globalBpm}</span>
+                   <button onClick={() => updateBpm(1)} className="text-white/40 hover:text-white font-black text-xs px-1 leading-none">+</button>
                 </div>
              </div>
           </div>
@@ -272,6 +269,7 @@ export const Header: React.FC = () => {
             step="0.01"
             value={masterVolume}
             onChange={(e) => setMasterVolume(parseFloat(e.target.value))}
+            onContextMenu={(e) => handleMidiRightClick(e, 'master_volume', 'Master Volume')}
             className="w-24 h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer custom-slider accent-[#00A3FF] hover:accent-[#00A3FF]/80 transition-all"
           />
         </div>

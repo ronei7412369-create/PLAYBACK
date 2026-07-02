@@ -14,6 +14,14 @@ export interface Stem {
     mid: number;  // -24 to 24 dB
     high: number; // -24 to 24 dB
   };
+  compressor?: {
+    enabled: boolean;
+    threshold: number;  // -100 to 0 dB
+    ratio: number;      // 1 to 20
+    attack: number;     // 0.001 to 1.0 seconds
+    release: number;    // 0.01 to 1.0 seconds
+    makeupGain: number; // 0 to 24 dB
+  };
 }
 
 export interface Marker {
@@ -50,6 +58,7 @@ export interface PlayerState {
   preloadedSongIds: string[];
 
   currentSong: Song | null;
+  globalBpm: number;
   isPlaying: boolean;
   currentTime: number;
   masterVolume: number;
@@ -124,6 +133,17 @@ export interface PlayerState {
   toggleStemSolo: (stemId: string) => void;
   setStemOutput: (stemId: string, output: number) => void;
   setStemEQ: (stemId: string, band: 'low' | 'mid' | 'high', value: number) => void;
+  setStemCompressor: (
+    stemId: string,
+    enabled: boolean,
+    threshold: number,
+    ratio: number,
+    attack: number,
+    release: number,
+    makeupGain: number
+  ) => void;
+
+  resetAllVolumesToZeroDb: () => void;
 
   initPersistence: () => Promise<void>;
 }

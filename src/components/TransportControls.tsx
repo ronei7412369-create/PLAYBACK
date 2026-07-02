@@ -1,5 +1,6 @@
 import React from 'react';
 import { usePlayerStore } from '../store/usePlayerStore';
+import { handleMidiRightClick } from '../store/useMidiStore';
 import { Play, Pause, Square, Repeat, Infinity as InfinityIcon, TrendingDown, SkipBack, SkipForward } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion } from 'motion/react';
@@ -10,8 +11,13 @@ export const TransportControls: React.FC = () => {
     isLooping, toggleLoop,
     isInfiniteLoop, toggleInfiniteLoop,
     isFadeOut, triggerFadeOut: toggleFadeOut,
-    playbackRate, setPlaybackRate
+    playbackRate, setPlaybackRate,
+    currentSong, globalBpm, tapTempo, updateBpm
   } = usePlayerStore();
+
+  const [isTapFlashed, setIsTapFlashed] = React.useState(false);
+  const bpm = currentSong?.bpm || globalBpm || 120;
+  const beatDuration = 60 / bpm;
 
   return (
     <div className="mx-auto my-6 max-w-[95%] w-[95%] h-auto md:h-28 py-4 md:py-0 ios-glass border border-white/10 flex flex-col md:flex-row items-center justify-center md:justify-between gap-3 md:gap-4 lg:gap-16 px-4 md:px-12 relative overflow-hidden z-50 rounded-[2.25rem] shadow-2xl pb-[max(16px,env(safe-area-inset-bottom))] md:pb-0 shrink-0">
@@ -24,6 +30,7 @@ export const TransportControls: React.FC = () => {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={toggleLoop}
+          onContextMenu={(e) => handleMidiRightClick(e, 'loop', 'Loop')}
           className={cn(
             "flex flex-col items-center justify-center gap-1 w-12 h-10 sm:w-14 sm:h-12 md:w-16 md:h-16 rounded-2xl transition-all border shrink-0",
             isLooping 
@@ -39,6 +46,7 @@ export const TransportControls: React.FC = () => {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={toggleInfiniteLoop}
+          onContextMenu={(e) => handleMidiRightClick(e, 'infinite_loop', 'Infinite Loop')}
           className={cn(
             "flex flex-col items-center justify-center gap-1 w-12 h-10 sm:w-14 sm:h-12 md:w-16 md:h-16 rounded-2xl transition-all border shrink-0",
             isInfiniteLoop 
@@ -83,6 +91,7 @@ export const TransportControls: React.FC = () => {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={toggleFadeOut}
+          onContextMenu={(e) => handleMidiRightClick(e, 'fade_out', 'Fade Out')}
           className={cn(
             "flex flex-col items-center justify-center gap-1 w-12 h-10 sm:w-14 sm:h-12 md:w-16 md:h-16 rounded-2xl transition-all border shrink-0",
             isFadeOut 
@@ -109,6 +118,7 @@ export const TransportControls: React.FC = () => {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={stop}
+          onContextMenu={(e) => handleMidiRightClick(e, 'stop', 'Stop')}
           className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 bg-white/5 border border-white/10 rounded-[1.25rem] md:rounded-[1.75rem] text-white/60 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all flex items-center justify-center shadow-lg"
         >
           <Square size={16} className="md:w-[22px] md:h-[22px]" strokeWidth={2.5} fill="currentColor" />
@@ -119,6 +129,7 @@ export const TransportControls: React.FC = () => {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={togglePlay}
+          onContextMenu={(e) => handleMidiRightClick(e, 'play_pause', 'Play / Pause')}
           className={cn(
             "w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-[1.5rem] md:rounded-[2rem] transition-all relative group focus:outline-none flex items-center justify-center border",
             isPlaying 
@@ -143,8 +154,68 @@ export const TransportControls: React.FC = () => {
         </motion.button>
       </div>
 
-      <div className="hidden md:flex flex-1 order-3 opacity-0 pointer-events-none">
-        {/* Invisible spacer for flex balance on desktop */}
+      {/* Tap Tempo & Master Clock Section */}
+      <div className="flex items-center justify-center gap-3 z-10 order-3 w-full md:w-auto bg-white/5 md:bg-transparent p-1.5 md:p-0 rounded-2xl md:rounded-none border border-white/5 md:border-transparent shadow-inner md:shadow-none shrink-0">
+        {/* Info & Micro controls */}
+        <div className="flex flex-col items-start gap-0.5 min-w-[70px] pl-1">
+          <span className="text-[7px] md:text-[8px] font-black uppercase text-[#00A3FF] tracking-wider leading-none">Master Clock</span>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <button 
+              onClick={() => updateBpm(-1)}
+              className="w-5 h-5 rounded bg-white/5 border border-white/10 text-white/50 hover:text-white flex items-center justify-center font-extrabold text-xs"
+            >
+              -
+            </button>
+            <span className="text-white font-extrabold text-xs md:text-sm tabular-nums leading-none min-w-[28px] text-center">
+              {bpm}
+            </span>
+            <button 
+              onClick={() => updateBpm(1)}
+              className="w-5 h-5 rounded bg-white/5 border border-white/10 text-white/50 hover:text-white flex items-center justify-center font-extrabold text-xs"
+            >
+              +
+            </button>
+            <span className="text-[7px] text-white/40 font-bold uppercase leading-none">BPM</span>
+          </div>
+        </div>
+
+        {/* Pulsing Visual Beat Metronome */}
+        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-white/5 border border-white/10" title="Visual Beat Indicator">
+          <motion.div
+            key={bpm}
+            animate={{
+              scale: [1, 1.4, 1],
+              opacity: [0.4, 1, 0.4],
+            }}
+            transition={{
+              duration: beatDuration,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+            className="w-2.5 h-2.5 rounded-full bg-[#00A3FF] shadow-[0_0_12px_#00A3FF]"
+          />
+        </div>
+
+        {/* Tap Tempo Button */}
+        <motion.button 
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => {
+            tapTempo();
+            setIsTapFlashed(true);
+            setTimeout(() => setIsTapFlashed(false), 120);
+          }}
+          onContextMenu={(e) => handleMidiRightClick(e, 'tap_tempo', 'Tap Tempo')}
+          className={cn(
+            "flex flex-col items-center justify-center gap-0.5 w-14 h-10 sm:w-16 sm:h-12 md:w-20 md:h-16 rounded-2xl transition-all border shrink-0",
+            isTapFlashed 
+              ? "bg-[#00A3FF]/30 border-[#00A3FF] text-white shadow-[0_0_20px_rgba(0,163,255,0.4)]" 
+              : "text-[#00A3FF] bg-[#00A3FF]/10 border-[#00A3FF]/20 hover:bg-[#00A3FF]/15 hover:border-[#00A3FF]/30"
+          )}
+        >
+          <span className="text-xs font-black uppercase tracking-widest leading-none">TAP</span>
+          <span className="text-[6px] md:text-[8px] font-bold uppercase tracking-wider text-white/40 leading-none">TEMPO</span>
+        </motion.button>
       </div>
     </div>
   );

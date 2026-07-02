@@ -3,6 +3,7 @@ import { usePlayerStore } from '../store/usePlayerStore';
 import { Volume2, Power, Edit3, SlidersHorizontal, X, Music } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
+import { handleMidiRightClick } from '../store/useMidiStore';
 
 // Frequencies for octave 4
 const PAD_KEYS = [
@@ -99,6 +100,7 @@ export const PadsPlayer: React.FC = () => {
                step="0.01"
                value={padVolume}
                onChange={(e) => setPadVolume(parseFloat(e.target.value))}
+               onContextMenu={(e) => handleMidiRightClick(e, 'pad_volume', 'Pad Volume')}
                className="w-14 h-1 bg-black/60 rounded-full appearance-none cursor-pointer accent-[#00A3FF] hover:accent-white transition-all custom-slider"
              />
           </div>
@@ -136,6 +138,7 @@ export const PadsPlayer: React.FC = () => {
                         value={val}
                         onChange={(e) => setPadEQ(band, parseFloat(e.target.value))}
                         onDoubleClick={() => setPadEQ(band, 0)}
+                        onContextMenu={(e) => handleMidiRightClick(e, `pad_eq_${band}`, `Pad EQ ${label}`)}
                         className="flex-1 h-1 bg-black/60 rounded-full appearance-none cursor-pointer custom-slider transition-all"
                         style={{ accentColor: color }}
                       />
@@ -166,6 +169,7 @@ export const PadsPlayer: React.FC = () => {
             <motion.button
                key={note}
                onClick={() => handlePadClick(note, freq)}
+               onContextMenu={(e) => handleMidiRightClick(e, 'ambient_pad', `Pad ${note}`, note)}
                whileHover={{ scale: editMode ? 1 : 1.02, y: editMode ? 0 : -1 }}
                whileTap={{ scale: 0.95 }}
                className={cn(

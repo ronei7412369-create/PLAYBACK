@@ -17,6 +17,8 @@ export class AudioEngine {
     eqHigh: BiquadFilterNode;
     analyser: AnalyserNode;
     source: AudioBufferSourceNode | null;
+    compressor?: DynamicsCompressorNode;
+    compressorGain?: GainNode;
   }> = new Map();
   
   private startTime: number = 0;
@@ -272,15 +274,38 @@ export class AudioEngine {
     analyser.fftSize = 64;
     analyser.smoothingTimeConstant = 0.8;
     
-    // Connect Chain: Source -> Gain -> EQ Low -> EQ Mid -> EQ High -> Panner -> Master
+    // Create Compressor and Makeup Gain nodes
+    const compressor = this.context.createDynamicsCompressor();
+    compressor.threshold.value = 0;
+    compressor.ratio.value = 1;
+    compressor.attack.value = 0.003;
+    compressor.release.value = 0.25;
+
+    const compressorGain = this.context.createGain();
+    compressorGain.gain.value = 1.0;
+    
+    // Connect Chain: Source -> Gain -> EQ Low -> EQ Mid -> EQ High -> Compressor -> CompressorGain -> Panner -> Master
     gain.connect(eqLow);
     eqLow.connect(eqMid);
     eqMid.connect(eqHigh);
-    eqHigh.connect(panner);
-    eqHigh.connect(analyser); // connect to analyser
+    eqHigh.connect(compressor);
+    compressor.connect(compressorGain);
+    compressorGain.connect(panner);
+    compressorGain.connect(analyser); // connect compressed signal to analyser
     panner.connect(this.masterGain);
 
-    this.stems.set(id, { buffer: audioBuffer, gain, panner, eqLow, eqMid, eqHigh, analyser, source: null });
+    this.stems.set(id, { 
+      buffer: audioBuffer, 
+      gain, 
+      panner, 
+      eqLow, 
+      eqMid, 
+      eqHigh, 
+      analyser, 
+      source: null,
+      compressor,
+      compressorGain
+    });
     return audioBuffer.duration;
   }
 
@@ -337,15 +362,38 @@ export class AudioEngine {
     analyser.fftSize = 64;
     analyser.smoothingTimeConstant = 0.8;
     
-    // Connect Chain: Source -> Gain -> EQ Low -> EQ Mid -> EQ High -> Panner -> Master
+    // Create Compressor and Makeup Gain nodes
+    const compressor = this.context.createDynamicsCompressor();
+    compressor.threshold.value = 0;
+    compressor.ratio.value = 1;
+    compressor.attack.value = 0.003;
+    compressor.release.value = 0.25;
+
+    const compressorGain = this.context.createGain();
+    compressorGain.gain.value = 1.0;
+    
+    // Connect Chain: Source -> Gain -> EQ Low -> EQ Mid -> EQ High -> Compressor -> CompressorGain -> Panner -> Master
     gain.connect(eqLow);
     eqLow.connect(eqMid);
     eqMid.connect(eqHigh);
-    eqHigh.connect(panner);
-    eqHigh.connect(analyser); // connect to analyser
+    eqHigh.connect(compressor);
+    compressor.connect(compressorGain);
+    compressorGain.connect(panner);
+    compressorGain.connect(analyser); // connect compressed signal to analyser
     panner.connect(this.masterGain);
 
-    this.stems.set(id, { buffer: audioBuffer, gain, panner, eqLow, eqMid, eqHigh, analyser, source: null });
+    this.stems.set(id, { 
+      buffer: audioBuffer, 
+      gain, 
+      panner, 
+      eqLow, 
+      eqMid, 
+      eqHigh, 
+      analyser, 
+      source: null,
+      compressor,
+      compressorGain
+    });
     return audioBuffer.duration;
   }
 
@@ -478,6 +526,33 @@ export class AudioEngine {
       if (band === 'low') stem.eqLow.gain.setTargetAtTime(value, this.context.currentTime, 0.05);
       if (band === 'mid') stem.eqMid.gain.setTargetAtTime(value, this.context.currentTime, 0.05);
       if (band === 'high') stem.eqHigh.gain.setTargetAtTime(value, this.context.currentTime, 0.05);
+    }
+  }
+
+  public setStemCompressor(
+    id: string,
+    enabled: boolean,
+    threshold: number,
+    ratio: number,
+    attack: number,
+    release: number,
+    makeupGain: number
+  ) {
+    const stem = this.stems.get(id);
+    if (stem && stem.compressor && stem.compressorGain) {
+      if (enabled) {
+        stem.compressor.threshold.setTargetAtTime(threshold, this.context.currentTime, 0.02);
+        stem.compressor.ratio.setTargetAtTime(ratio, this.context.currentTime, 0.02);
+        stem.compressor.attack.setTargetAtTime(attack, this.context.currentTime, 0.02);
+        stem.compressor.release.setTargetAtTime(release, this.context.currentTime, 0.02);
+        
+        const linearGain = Math.pow(10, makeupGain / 20);
+        stem.compressorGain.gain.setTargetAtTime(linearGain, this.context.currentTime, 0.02);
+      } else {
+        stem.compressor.threshold.setTargetAtTime(0, this.context.currentTime, 0.02);
+        stem.compressor.ratio.setTargetAtTime(1, this.context.currentTime, 0.02);
+        stem.compressorGain.gain.setTargetAtTime(1.0, this.context.currentTime, 0.02);
+      }
     }
   }
 

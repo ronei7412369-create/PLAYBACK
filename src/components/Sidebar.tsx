@@ -44,7 +44,7 @@ export const Sidebar: React.FC = () => {
              name,
              buffer: null as any,
              originalFile: file,
-             volume: 1.0,
+             volume: 0.5,
              isMuted: false,
              isSoloed: false,
              output: file.name.toLowerCase().includes('click') || file.name.toLowerCase().includes('guide') ? 1 : 3,
