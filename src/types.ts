@@ -36,6 +36,7 @@ export interface Song {
   id: string;
   title: string;
   artist: string;
+  coverUrl?: string; // Music banner / cover artwork
   bpm: number;
   key: string;
   timeSignature: string;
@@ -94,7 +95,8 @@ export interface PlayerState {
   toggleStageMode: () => void;
   setShowSidebar: (show: boolean) => void;
 
-  updateSongMetadata: (id: string, title: string, artist: string) => void;
+  updateSongMetadata: (id: string, title: string, artist: string, coverUrl?: string, bpm?: number, key?: string) => void;
+  updateSongKey: (id: string, key: string) => void;
   updateSongLyrics: (id: string, lyrics: string) => void;
   removeFromSetlist: (id: string) => void;
   clearSetlist: () => void;

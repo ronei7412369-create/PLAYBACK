@@ -5,6 +5,7 @@ import { Music, Loader, UploadCloud } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { usePlayerStore } from '../store/usePlayerStore';
+import { getCoverUrl } from '../lib/coverArt';
 
 export const StemSplitter: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -131,10 +132,13 @@ export const StemSplitter: React.FC = () => {
       const vocalsData = createWavData(result.vocals.left, result.vocals.right, 'vocals.wav');
 
       
+      const songTitle = selectedFile.name.replace(/\.[^/.]+$/, "");
+      const songArtist = 'AI Processed';
       addProcessedSong({
         id: songId,
-        title: selectedFile.name.replace(/\.[^/.]+$/, ""),
-        artist: 'AI Processed',
+        title: songTitle,
+        artist: songArtist,
+        coverUrl: getCoverUrl(songTitle, songArtist),
         stems: [
           { id: `${songId}-vocals`, name: 'Vocals', file: vocalsData.url, originalFile: vocalsData.file, output: 3, pan: 0, volume: 0.5, isMuted: false, isSoloed: false },
           { id: `${songId}-drums`, name: 'Drums', file: drumsData.url, originalFile: drumsData.file, output: 3, pan: 0, volume: 0.5, isMuted: false, isSoloed: false },

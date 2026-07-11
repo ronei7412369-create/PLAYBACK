@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { PlayerState, Song } from '../types';
 import { audioEngine } from '../services/audioEngine';
 import { storageEngine } from '../services/storageEngine';
+import { getCoverUrl } from '../lib/coverArt';
+import { detectKeyAndBpm } from '../lib/songHelpers';
 
 import { auth, signInWithGoogle, signOut, signInWithEmail, signUpWithEmail, createInternalUserWithEmail, db } from '../services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -114,7 +116,10 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
       
       const newState: any = {};
       if (savedSongs && savedSongs.length > 0) {
-        newState.setlist = savedSongs;
+        newState.setlist = savedSongs.map(song => ({
+          ...song,
+          coverUrl: song.coverUrl || getCoverUrl(song.title, song.artist)
+        }));
       }
       if (savedSetlists && savedSetlists.length > 0) {
         newState.savedSetlists = savedSetlists;
@@ -154,11 +159,14 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
   },
 
   addProcessedSong: async (partialSong) => {
+    const stemNames = partialSong.stems ? partialSong.stems.map(s => s.name) : [];
+    const { key: detectedKey, bpm: detectedBpm } = detectKeyAndBpm(partialSong.title || "", stemNames);
+
     const fullSong: Song = {
       ...partialSong,
       duration: 0, // We could try to read duration but 0 is fine until decoded
-      bpm: 120,
-      key: 'C',
+      bpm: detectedBpm,
+      key: detectedKey,
       timeSignature: '4/4',
       markers: [],
     };
@@ -773,10 +781,35 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
     });
   },
 
-  updateSongMetadata: (id, title, artist) => {
+  updateSongMetadata: (id, title, artist, coverUrl, bpm, key) => {
     set((state) => {
-       const updatedSetlist = state.setlist.map(s => s.id === id ? { ...s, title, artist } : s);
-       const updatedSong = state.currentSong?.id === id ? { ...state.currentSong, title, artist } : state.currentSong;
+       const existingSong = state.setlist.find(s => s.id === id);
+       // Use explicitly provided coverUrl, or fallback to existing song's coverUrl, or generate a new one
+       const finalCoverUrl = coverUrl !== undefined ? coverUrl : (existingSong?.coverUrl || getCoverUrl(title, artist));
+       const finalBpm = bpm !== undefined ? bpm : (existingSong?.bpm || 120);
+       const finalKey = key !== undefined ? key : (existingSong?.key || 'C');
+
+       const updatedSetlist = state.setlist.map(s => s.id === id ? { ...s, title, artist, coverUrl: finalCoverUrl, bpm: finalBpm, key: finalKey } : s);
+       const updatedSong = state.currentSong?.id === id ? { ...state.currentSong, title, artist, coverUrl: finalCoverUrl, bpm: finalBpm, key: finalKey } : state.currentSong;
+       
+       if (updatedSong) {
+         storageEngine.saveSong(updatedSong, []).catch(console.error);
+       } else {
+         const foundSong = updatedSetlist.find(s => s.id === id);
+         if (foundSong) storageEngine.saveSong(foundSong, []).catch(console.error);
+       }
+
+       return {
+         setlist: updatedSetlist,
+         currentSong: updatedSong
+       };
+    });
+  },
+
+  updateSongKey: (id, key) => {
+    set((state) => {
+       const updatedSetlist = state.setlist.map(s => s.id === id ? { ...s, key } : s);
+       const updatedSong = state.currentSong?.id === id ? { ...state.currentSong, key } : state.currentSong;
        
        if (updatedSong) {
          storageEngine.saveSong(updatedSong, []).catch(console.error);

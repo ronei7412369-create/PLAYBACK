@@ -8,6 +8,8 @@ import { Song } from '../types';
 import { PlayList } from './PlayList';
 import { TelegramImportModal } from './TelegramImportModal';
 import { SetlistModal } from './SetlistModal';
+import { getCoverUrl } from '../lib/coverArt';
+import { detectKeyAndBpm } from '../lib/songHelpers';
 
 export const Sidebar: React.FC = () => {
   const { setlist, currentSong, setCurrentSong, importSong, clearSetlist } = usePlayerStore();
@@ -69,12 +71,18 @@ export const Sidebar: React.FC = () => {
       // Try extracting peaks once all stems are loaded
       const extractedPeaks = audioEngine.extractPeaks(120);
       
+      const songTitle = files.length > 1 ? "New Multitrack" : files[0].name.replace(/\.[^/.]+$/, "");
+      const songArtist = "Imported Files";
+      const stemNames = stems.map(s => s.name);
+      const { key: detectedKey, bpm: detectedBpm } = detectKeyAndBpm(songTitle, stemNames);
+
       const newSong: Song = {
         id: Math.random().toString(36).substr(2, 9),
-        title: files.length > 1 ? "New Multitrack" : files[0].name.replace(/\.[^/.]+$/, ""),
-        artist: "Imported Files",
-        bpm: 120,
-        key: "C",
+        title: songTitle,
+        artist: songArtist,
+        coverUrl: getCoverUrl(songTitle, songArtist),
+        bpm: detectedBpm,
+        key: detectedKey,
         timeSignature: "4/4",
         duration: totalDuration,
         waveformPeaks: extractedPeaks,

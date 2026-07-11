@@ -9,9 +9,16 @@ import { StemSplitter } from './StemSplitter';
 import { MidiMapModal } from './MidiMapModal';
 import { AnimatedLogo } from './AnimatedLogo';
 import { handleMidiRightClick } from '../store/useMidiStore';
+import { getCoverUrl } from '../lib/coverArt';
+
+const AVAILABLE_KEYS = [
+  'C', 'Cm', 'C#', 'C#m', 'Db', 'Dbm', 'D', 'Dm', 'D#', 'D#m', 'Eb', 'Ebm',
+  'E', 'Em', 'F', 'Fm', 'F#', 'F#m', 'Gb', 'Gbm', 'G', 'Gm', 'G#', 'G#m',
+  'Ab', 'Abm', 'A', 'Am', 'A#', 'A#m', 'Bb', 'Bbm', 'B', 'Bm'
+];
 
 export const Header: React.FC = () => {
-  const { currentSong, globalBpm, masterVolume, setMasterVolume, masterEq, setMasterEQ, isPlaying, toggleMetronome, metronomeEnabled, isLRSplit, toggleLRSplit, isStageMode, toggleStageMode, logout, isSidebarOpen, setShowSidebar, tapTempo, updateBpm, cycleTimeSignature, pitchShift, setPitchShift, isAdmin } = usePlayerStore();
+  const { currentSong, globalBpm, masterVolume, setMasterVolume, masterEq, setMasterEQ, isPlaying, toggleMetronome, metronomeEnabled, isLRSplit, toggleLRSplit, isStageMode, toggleStageMode, logout, isSidebarOpen, setShowSidebar, tapTempo, updateBpm, cycleTimeSignature, pitchShift, setPitchShift, isAdmin, updateSongKey } = usePlayerStore();
   const [showEq, setShowEq] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [showMidiMap, setShowMidiMap] = useState(false);
@@ -199,12 +206,24 @@ export const Header: React.FC = () => {
         )}
 
         <motion.div 
-          animate={{ scale: isPlaying ? [1, 1.02, 1] : 1 }}
+          animate={{ scale: isPlaying ? [1, 1.01, 1] : 1 }}
           transition={{ repeat: Infinity, duration: 2 }}
-          className="flex flex-col hidden xl:flex mr-2"
+          className="hidden xl:flex items-center gap-3 mr-4 bg-white/[0.02] border border-white/5 py-1.5 px-3 rounded-2xl"
         >
-          <span className="text-[8px] text-[#00A3FF] uppercase tracking-[0.2em] font-extrabold mb-0.5">Now Performing</span>
-          <span className="text-white font-extrabold text-base tracking-tight truncate max-w-[180px]">{currentSong?.title || "No Song Selected"}</span>
+          {currentSong && (
+            <div className="w-9 h-9 rounded-xl overflow-hidden border border-white/10 shadow-md shadow-black/40 shrink-0">
+              <img 
+                src={currentSong.coverUrl || getCoverUrl(currentSong.title, currentSong.artist)} 
+                alt={currentSong.title} 
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+          )}
+          <div className="flex flex-col min-w-0">
+            <span className="text-[8px] text-[#00A3FF] uppercase tracking-[0.2em] font-extrabold mb-0.5 leading-none">Now Performing</span>
+            <span className="text-white font-extrabold text-xs md:text-sm tracking-tight truncate max-w-[150px]">{currentSong?.title || "No Song Selected"}</span>
+          </div>
         </motion.div>
 
         {/* Unified Controls Container */}
@@ -292,18 +311,36 @@ export const Header: React.FC = () => {
                   exit={{ opacity: 0, y: 10 }}
                   className="fixed sm:absolute top-24 sm:top-auto sm:bottom-auto sm:mt-2 left-1/2 -translate-x-1/2 sm:translate-x-0 sm:left-auto sm:right-0 w-[340px] max-w-[95vw] bg-[#0A0A0B]/95 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 shadow-[0_15px_40px_rgba(0,0,0,0.6),0_0_20px_rgba(241,196,15,0.05)] z-[100] flex flex-col gap-4 text-left"
                 >
-                  <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                    <div className="flex flex-col">
-                      <span className="text-[10px] uppercase font-black text-[#F1C40F] tracking-widest leading-none mb-1">Selecionar Tom</span>
-                      <span className="text-[11px] text-white/50 font-bold">
-                        Tom Original: <span className="text-white font-extrabold">{songKey || "Sem Tom"}</span>
-                      </span>
+                  <div className="flex flex-col gap-3 border-b border-white/5 pb-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase font-black text-[#F1C40F] tracking-widest leading-none">Selecionar Tom / Transposição</span>
+                      {pitchShift !== 0 && (
+                        <span className="text-[10px] bg-[#F1C40F]/15 text-[#F1C40F] border border-[#F1C40F]/20 px-2.5 py-0.5 rounded-full font-extrabold font-mono leading-none">
+                          {pitchShift > 0 ? `+${pitchShift}` : pitchShift} semitones
+                        </span>
+                      )}
                     </div>
-                    {pitchShift !== 0 && (
-                      <span className="text-[10px] bg-[#F1C40F]/15 text-[#F1C40F] border border-[#F1C40F]/20 px-2 py-0.5 rounded-full font-extrabold font-mono">
-                        {pitchShift > 0 ? `+${pitchShift}` : pitchShift} semitones
-                      </span>
-                    )}
+                    
+                    <div className="flex items-center justify-between bg-white/5 border border-white/5 rounded-xl px-3 py-2">
+                      <div className="flex flex-col">
+                        <span className="text-[8px] uppercase font-black text-white/40 tracking-wider">Tom Original da Canção</span>
+                        <span className="text-[10px] text-white/60 font-semibold mt-0.5">Mude para o tom real da gravação</span>
+                      </div>
+                      <select 
+                        disabled={!currentSong}
+                        value={songKey || "C"} 
+                        onChange={(e) => {
+                          if (currentSong) {
+                            updateSongKey(currentSong.id, e.target.value);
+                          }
+                        }}
+                        className="bg-black/60 hover:bg-black text-white text-[11px] font-black font-mono border border-white/10 rounded-lg px-2.5 py-1 cursor-pointer outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {AVAILABLE_KEYS.map(k => (
+                          <option key={k} value={k} className="bg-[#0A0A0B] text-white font-mono">{k}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
                   {!songKey ? (

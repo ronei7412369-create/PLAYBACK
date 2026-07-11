@@ -2,25 +2,51 @@ import React, { useState } from 'react';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
-import { FileMusic, Search, Edit3, Save, X, Trash2 } from 'lucide-react';
+import { FileMusic, Search, Edit3, Save, X, Trash2, Image, Upload } from 'lucide-react';
+import { getCoverUrl } from '../lib/coverArt';
+
+const AVAILABLE_KEYS = [
+  'C', 'Cm', 'C#', 'C#m', 'Db', 'Dbm', 'D', 'Dm', 'D#', 'D#m', 'Eb', 'Ebm',
+  'E', 'Em', 'F', 'Fm', 'F#', 'F#m', 'Gb', 'Gbm', 'G', 'Gm', 'G#', 'G#m',
+  'Ab', 'Abm', 'A', 'Am', 'A#', 'A#m', 'Bb', 'Bbm', 'B', 'Bm'
+];
 
 export const PlayList: React.FC = () => {
   const { setlist, currentSong, setCurrentSong, removeFromSetlist, updateSongMetadata, isLoadingSong, preloadedSongIds, preloadingSongId } = usePlayerStore();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editArtist, setEditArtist] = useState('');
+  const [editCoverUrl, setEditCoverUrl] = useState('');
+  const [editBpm, setEditBpm] = useState<number>(120);
+  const [editKey, setEditKey] = useState<string>('C');
+
+  const handleCoverFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          setEditCoverUrl(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const startEdit = (song: any) => {
     if (isLoadingSong) return;
     setEditingId(song.id);
     setEditTitle(song.title);
     setEditArtist(song.artist);
+    setEditCoverUrl(song.coverUrl || '');
+    setEditBpm(song.bpm || 120);
+    setEditKey(song.key || 'C');
   };
 
   const saveEdit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (editingId) {
-      updateSongMetadata(editingId, editTitle, editArtist);
+      updateSongMetadata(editingId, editTitle, editArtist, editCoverUrl, editBpm, editKey);
       setEditingId(null);
     }
   };
@@ -72,44 +98,123 @@ export const PlayList: React.FC = () => {
                     : "bg-black/30 border-white/5 hover:bg-white/5 hover:border-white/10"
                 )}
               >
-                {/* Number indicator */}
-                <div className="absolute top-3.5 left-3.5 w-5 h-5 rounded-lg bg-black/50 flex items-center justify-center text-[8px] font-black tracking-widest text-[#00A3FF] border border-white/5 shadow-inner">
-                  {(idx + 1).toString().padStart(2, '0')}
-                </div>
-
-                {/* Edit Form */}
-                {editingId === song.id ? (
-                  <form onSubmit={saveEdit} className="flex flex-col gap-2 pl-7 w-full pr-8" onClick={(e) => e.stopPropagation()}>
-                    <input 
-                      autoFocus
-                      className="bg-black/60 border border-[#00A3FF]/40 outline-none text-white font-extrabold rounded-lg px-2.5 py-1 text-xs w-full focus:border-[#00A3FF] focus:ring-1 focus:ring-[#00A3FF] transition-all"
-                      value={editTitle}
-                      onChange={e => setEditTitle(e.target.value)}
+                <div className="flex items-center gap-3 w-full min-w-0">
+                  {/* Song Cover Banner Thumbnail */}
+                  <div 
+                    onClick={(e) => {
+                      if (editingId === song.id) {
+                        e.stopPropagation();
+                        document.getElementById(`cover-upload-${song.id}`)?.click();
+                      }
+                    }}
+                    className={cn(
+                      "relative w-10 h-10 rounded-xl overflow-hidden bg-black/40 border border-white/10 shrink-0 shadow-lg transition-all flex items-center justify-center",
+                      editingId === song.id ? "ring-2 ring-[#00A3FF]/40 cursor-pointer hover:border-[#00A3FF]" : "group-hover:border-[#00A3FF]/30"
+                    )}
+                  >
+                    <img 
+                      src={editingId === song.id ? (editCoverUrl || getCoverUrl(editTitle, editArtist)) : (song.coverUrl || getCoverUrl(song.title, song.artist))} 
+                      alt={song.title} 
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      referrerPolicy="no-referrer"
                     />
-                    <input 
-                      className="bg-black/60 border border-white/10 outline-none text-white/50 font-medium rounded-lg px-2.5 py-1 text-[10px] w-full focus:border-white/20 transition-all"
-                      value={editArtist}
-                      onChange={e => setEditArtist(e.target.value)}
-                    />
-                    <div className="flex gap-2 justify-end mt-1">
-                      <button type="button" onClick={() => setEditingId(null)} className="p-1.5 hover:bg-white/10 rounded-lg text-white/40 hover:text-white transition-colors">
-                        <X size={12} />
-                      </button>
-                      <button type="submit" className="p-1.5 hover:bg-[#00A3FF]/20 rounded-lg text-[#00A3FF] transition-colors">
-                        <Save size={12} />
-                      </button>
-                    </div>
-                  </form>
-                ) : (
-                  <div className="flex flex-col pl-7 pr-8 w-full truncate">
-                     <span className={cn("font-extrabold text-xs truncate transition-colors", currentSong?.id === song.id ? "text-white" : "text-white/80 group-hover:text-white")}>
-                       {song.title}
-                     </span>
-                     <span className={cn("font-medium text-[10px] truncate mt-0.5 transition-colors", currentSong?.id === song.id ? "text-white/60" : "text-white/35 group-hover:text-white/50")}>
-                       {song.artist} • <span className="font-mono">{song.bpm}</span> BPM
-                     </span>
+                    {editingId === song.id ? (
+                      <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-0.5 opacity-100 transition-all text-white hover:bg-black/80">
+                        <Edit3 size={10} className="text-[#00A3FF]" />
+                        <span className="text-[7px] uppercase tracking-wider font-extrabold leading-none text-white/80">Capa</span>
+                        <input 
+                          type="file" 
+                          id={`cover-upload-${song.id}`}
+                          accept="image/*" 
+                          className="hidden" 
+                          onChange={handleCoverFileChange}
+                        />
+                      </div>
+                    ) : (
+                      /* Dark gradient overlay for number */
+                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center group-hover:bg-black/50 transition-all">
+                        <span className="text-[10px] font-black text-white/90 font-mono tracking-tighter">
+                          {(idx + 1).toString().padStart(2, '0')}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                )}
+
+                  {/* Edit Form / Text details */}
+                  {editingId === song.id ? (
+                    <form onSubmit={saveEdit} className="flex flex-col gap-2 w-full pr-8" onClick={(e) => e.stopPropagation()}>
+                      <input 
+                        autoFocus
+                        className="bg-black/60 border border-[#00A3FF]/40 outline-none text-white font-extrabold rounded-lg px-2.5 py-1 text-xs w-full focus:border-[#00A3FF] focus:ring-1 focus:ring-[#00A3FF] transition-all"
+                        value={editTitle}
+                        onChange={e => setEditTitle(e.target.value)}
+                        placeholder="Nome da canção"
+                      />
+                      <input 
+                        className="bg-black/60 border border-white/10 outline-none text-white/50 font-medium rounded-lg px-2.5 py-1 text-[10px] w-full focus:border-white/20 transition-all"
+                        value={editArtist}
+                        onChange={e => setEditArtist(e.target.value)}
+                        placeholder="Artista / Ministério"
+                      />
+
+                      <div className="flex gap-2 w-full">
+                        <div className="flex-1 flex flex-col gap-0.5">
+                          <label className="text-[8px] font-bold text-white/40 uppercase tracking-wide">BPM</label>
+                          <input 
+                            type="number"
+                            className="bg-black/60 border border-white/10 outline-none text-white font-mono rounded-lg px-2.5 py-1 text-[10px] w-full focus:border-white/20 transition-all"
+                            value={editBpm}
+                            onChange={e => setEditBpm(parseInt(e.target.value) || 120)}
+                            placeholder="120"
+                            min={40}
+                            max={250}
+                          />
+                        </div>
+                        <div className="flex-1 flex flex-col gap-0.5">
+                          <label className="text-[8px] font-bold text-white/40 uppercase tracking-wide">Tom Original</label>
+                          <select 
+                            className="bg-black/60 border border-white/10 outline-none text-white/80 font-mono rounded-lg px-2 py-1 text-[10px] w-full focus:border-white/20 transition-all cursor-pointer"
+                            value={editKey}
+                            onChange={e => setEditKey(e.target.value)}
+                          >
+                            {AVAILABLE_KEYS.map(k => (
+                              <option key={k} value={k} className="bg-[#0A0A0B] text-white">{k}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      
+                      {/* Optional Web URL cover field */}
+                      <div className="flex items-center gap-1.5 mt-0.5 bg-black/20 p-1.5 rounded-lg border border-white/5">
+                        <Image size={10} className="text-white/40 shrink-0" />
+                        <input 
+                          className="bg-transparent border-none outline-none text-white/60 font-medium text-[9px] w-full placeholder-white/20"
+                          value={editCoverUrl}
+                          onChange={e => setEditCoverUrl(e.target.value)}
+                          placeholder="Link da Capa (opcional)"
+                        />
+                      </div>
+
+                      <div className="flex gap-2 justify-end mt-1">
+                        <button type="button" onClick={() => setEditingId(null)} className="p-1.5 hover:bg-white/10 rounded-lg text-white/40 hover:text-white transition-colors">
+                          <X size={12} />
+                        </button>
+                        <button type="submit" className="p-1.5 hover:bg-[#00A3FF]/20 rounded-lg text-[#00A3FF] transition-colors">
+                          <Save size={12} />
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="flex flex-col pr-8 w-full truncate">
+                       <span className={cn("font-extrabold text-xs truncate transition-colors", currentSong?.id === song.id ? "text-white" : "text-white/80 group-hover:text-white")}>
+                         {song.title}
+                       </span>
+                       <span className={cn("font-medium text-[10px] truncate mt-0.5 transition-colors", currentSong?.id === song.id ? "text-white/60" : "text-white/35 group-hover:text-white/50")}>
+                         {song.artist} • <span className="font-mono">{song.bpm}</span> BPM • Tom: <span className="font-mono font-semibold text-[#F1C40F]">{song.key || "C"}</span>
+                       </span>
+                    </div>
+                  )}
+                </div>
 
                 {/* Hover Actions */}
                 {editingId !== song.id && (
