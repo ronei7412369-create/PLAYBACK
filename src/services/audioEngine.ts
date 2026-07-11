@@ -665,6 +665,19 @@ export class AudioEngine {
     return max / 255; // return normalized 0-1
   }
 
+  public getStemFrequencyData(id: string, fftSize: number = 256): Uint8Array | null {
+    const stem = this.stems.get(id);
+    if (!stem || !stem.analyser) return null;
+    
+    if (stem.analyser.fftSize !== fftSize) {
+      stem.analyser.fftSize = fftSize;
+    }
+    
+    const dataArray = new Uint8Array(stem.analyser.frequencyBinCount);
+    stem.analyser.getByteFrequencyData(dataArray);
+    return dataArray;
+  }
+
   public extractPeaks(buckets: number = 120): number[] {
     const peaks = new Array(buckets).fill(0);
     if (this.stems.size === 0) return peaks;

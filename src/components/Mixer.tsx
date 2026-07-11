@@ -234,8 +234,297 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({ stem, index, onOpenDetails 
   );
 };
 
+// SpectrumAnalyzer Component
+interface SpectrumAnalyzerProps {
+  stemId: string;
+  trackColor: string;
+  isPlaying: boolean;
+  eq: { low: number; mid: number; high: number };
+}
+
+const SpectrumAnalyzer: React.FC<SpectrumAnalyzerProps> = ({ stemId, trackColor, isPlaying, eq }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const animationRef = useRef<number | null>(null);
+  const peaksRef = useRef<number[]>([]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
+
+    const resizeCanvas = () => {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = container.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      canvas.style.width = `${rect.width}px`;
+      canvas.style.height = `${rect.height}px`;
+      
+      if (peaksRef.current.length !== Math.floor(rect.width)) {
+        peaksRef.current = new Array(Math.floor(rect.width)).fill(rect.height * dpr);
+      }
+    };
+
+    resizeCanvas();
+
+    const resizeObserver = new ResizeObserver(() => {
+      resizeCanvas();
+    });
+    resizeObserver.observe(container);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const render = () => {
+      if (!active) return;
+
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        animationRef.current = requestAnimationFrame(render);
+        return;
+      }
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        animationRef.current = requestAnimationFrame(render);
+        return;
+      }
+
+      const width = canvas.width;
+      const height = canvas.height;
+      const dpr = window.devicePixelRatio || 1;
+
+      // 1. Draw background
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = '#09090B';
+      ctx.fillRect(0, 0, width, height);
+
+      // Draw subtle horizontal dB lines
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+      ctx.lineWidth = 1 * dpr;
+      const dbSteps = [0.15, 0.35, 0.55, 0.75, 0.9];
+      const dbLabels = ['-3 dB', '-12 dB', '-24 dB', '-48 dB', '-60 dB'];
+      dbSteps.forEach((step, idx) => {
+        const y = height * step;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.font = `${8 * dpr}px monospace`;
+        ctx.fillText(dbLabels[idx], 8 * dpr, y - 4 * dpr);
+      });
+
+      // 2. Map Logarithmic Frequencies and Vertical Gridlines
+      const minFreq = 20;
+      const maxFreq = 20000;
+      
+      const getXForFreq = (f: number) => {
+        return ((Math.log(f) - Math.log(minFreq)) / (Math.log(maxFreq) - Math.log(minFreq))) * width;
+      };
+
+      const freqLines = [50, 100, 200, 500, 1000, 2000, 5000, 10000, 15000];
+      freqLines.forEach((f) => {
+        const x = getXForFreq(f);
+        if (x >= 0 && x <= width) {
+          ctx.strokeStyle = f === 320 || f === 3200 ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.025)';
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, height);
+          ctx.stroke();
+
+          // Frequency labels at the bottom
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+          ctx.font = `${7 * dpr}px monospace`;
+          const label = f >= 1000 ? `${(f / 1000).toFixed(0)}kHz` : `${f}Hz`;
+          ctx.fillText(label, x + 3 * dpr, height - 6 * dpr);
+        }
+      });
+
+      // Highlight the EQ crossover lines (320Hz / 3.2kHz) as vertical bands
+      const x320 = getXForFreq(320);
+      const x3200 = getXForFreq(3200);
+
+      // Label bands
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.font = `bold ${8 * dpr}px sans-serif`;
+      ctx.fillText('GRAVES', x320 / 2 - 20 * dpr, 18 * dpr);
+      ctx.fillText('MÉDIOS', x320 + (x3200 - x320) / 2 - 20 * dpr, 18 * dpr);
+      ctx.fillText('AGUDOS', x3200 + (width - x3200) / 2 - 20 * dpr, 18 * dpr);
+
+      // 3. Draw EQ Curve Overlay (Interactive visualizer response)
+      ctx.beginPath();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+      ctx.lineWidth = 1.2 * dpr;
+      ctx.setLineDash([4 * dpr, 4 * dpr]);
+
+      for (let x = 0; x < width; x += 2 * dpr) {
+        const t = x / width;
+        const f = minFreq * Math.pow(maxFreq / minFreq, t);
+
+        const w_low = f / 320;
+        const resp_low = (eq.low || 0) / (1 + w_low * w_low);
+
+        const w_high = f / 3200;
+        const resp_high = (eq.high || 0) * (w_high * w_high) / (1 + w_high * w_high);
+
+        const x_mid = Math.log2(f / 1000);
+        const resp_mid = (eq.mid || 0) * Math.exp(-0.8 * x_mid * x_mid);
+
+        const totalDb = resp_low + resp_mid + resp_high;
+        // Map totalDb (-24 to +24) to y coordinates (centered vertically)
+        const eqY = (height / 2) - (totalDb / 24) * (height / 3.5);
+
+        if (x === 0) {
+          ctx.moveTo(x, eqY);
+        } else {
+          ctx.lineTo(x, eqY);
+        }
+      }
+      ctx.stroke();
+      ctx.setLineDash([]); // Reset dash
+
+      // 4. Get real-time frequency data
+      const dataArray = audioEngine.getStemFrequencyData(stemId, 512);
+
+      if (dataArray && isPlaying) {
+        const binCount = dataArray.length;
+        const nyquist = (audioEngine.getContext()?.sampleRate || 44100) / 2;
+
+        const points: { x: number; y: number }[] = [];
+
+        for (let x = 0; x < width; x += dpr) {
+          const t = x / width;
+          const f = minFreq * Math.pow(maxFreq / minFreq, t);
+
+          const exactIndex = (f / nyquist) * binCount;
+          const binIndex = Math.floor(exactIndex);
+          const nextIndex = Math.min(binIndex + 1, binCount - 1);
+          const frac = exactIndex - binIndex;
+
+          let val = 0;
+          if (binIndex < binCount) {
+            val = dataArray[binIndex] * (1 - frac) + dataArray[nextIndex] * frac;
+          }
+
+          const normalized = val / 255;
+          const scaledHeight = normalized * height * 0.75;
+          const y = height - scaledHeight - 2 * dpr;
+
+          points.push({ x, y });
+        }
+
+        // Render filled gradient
+        ctx.beginPath();
+        ctx.moveTo(0, height);
+        points.forEach(pt => ctx.lineTo(pt.x, pt.y));
+        ctx.lineTo(width, height);
+        ctx.closePath();
+
+        const grad = ctx.createLinearGradient(0, 0, 0, height);
+        grad.addColorStop(0, `${trackColor}35`);
+        grad.addColorStop(0.5, `${trackColor}10`);
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        // Render line
+        ctx.beginPath();
+        points.forEach((pt, idx) => {
+          if (idx === 0) ctx.moveTo(pt.x, pt.y);
+          else ctx.lineTo(pt.x, pt.y);
+        });
+        ctx.strokeStyle = trackColor;
+        ctx.lineWidth = 1.8 * dpr;
+        ctx.stroke();
+
+        // 5. Peak Hold logic
+        if (peaksRef.current.length === points.length) {
+          const peaks = peaksRef.current;
+          points.forEach((pt, i) => {
+            if (pt.y < peaks[i]) {
+              peaks[i] = pt.y;
+            } else {
+              peaks[i] += 0.35 * dpr;
+              if (peaks[i] > height) peaks[i] = height;
+            }
+          });
+
+          ctx.beginPath();
+          for (let i = 0; i < width; i += 3 * dpr) {
+            const y = peaks[Math.floor(i)];
+            if (y < height - 5 * dpr) {
+              if (i === 0) ctx.moveTo(i, y);
+              else ctx.lineTo(i, y);
+            }
+          }
+          ctx.strokeStyle = `${trackColor}50`;
+          ctx.lineWidth = 1 * dpr;
+          ctx.stroke();
+        }
+
+      } else {
+        // Draw standard resting baseline
+        const pulse = 1 * Math.sin(Date.now() * 0.003);
+        ctx.beginPath();
+        ctx.moveTo(0, height - 12 * dpr + pulse);
+        ctx.lineTo(width, height - 12 * dpr + pulse);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+        ctx.lineWidth = 1 * dpr;
+        ctx.stroke();
+      }
+
+      animationRef.current = requestAnimationFrame(render);
+    };
+
+    render();
+
+    return () => {
+      active = false;
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [stemId, trackColor, isPlaying, eq]);
+
+  return (
+    <div className="w-full flex flex-col gap-1.5 bg-black/40 border border-white/5 rounded-2xl p-3 shadow-inner">
+      <div className="flex items-center justify-between px-1">
+        <div className="flex items-center gap-1.5">
+          <Activity size={12} className="animate-pulse" style={{ color: trackColor }} />
+          <span className="text-[10px] uppercase font-black text-white/40 tracking-wider">
+            Analisador de Espectro de Frequência (Visual EQ)
+          </span>
+        </div>
+        <div className="flex items-center gap-2 text-[8px] font-bold text-white/30 tracking-widest uppercase">
+          <span className="flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#FF3B30' }} /> Graves (&lt; 320Hz)
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: trackColor }} /> Médios (320Hz - 3.2kHz)
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#0A84FF' }} /> Agudos (&gt; 3.2kHz)
+          </span>
+        </div>
+      </div>
+      
+      <div ref={containerRef} className="w-full h-24 md:h-28 rounded-xl overflow-hidden relative border border-white/5">
+        <canvas ref={canvasRef} className="absolute inset-0" />
+      </div>
+    </div>
+  );
+};
+
 const TrackDetailsModal: React.FC<{ stem: Stem, index: number, onClose: () => void }> = ({ stem, index, onClose }) => {
-  const { updateStemVolume, toggleStemMute, toggleStemSolo, setStemOutput, setStemEQ, setStemCompressor } = usePlayerStore();
+  const { updateStemVolume, toggleStemMute, toggleStemSolo, setStemOutput, setStemEQ, setStemCompressor, isPlaying } = usePlayerStore();
   const trackColor = TRACK_COLORS[index % TRACK_COLORS.length];
 
   const compressor = stem.compressor || {
@@ -327,9 +616,17 @@ const TrackDetailsModal: React.FC<{ stem: Stem, index: number, onClose: () => vo
             </button>
           </div>
 
-          <div className="p-5 flex flex-col sm:flex-row gap-5 overflow-y-auto max-h-[80vh]">
+          <div className="p-5 flex flex-col gap-5 overflow-y-auto max-h-[80vh]">
             
-            {/* Column 1: Primary Controls */}
+            <SpectrumAnalyzer 
+              stemId={stem.id} 
+              trackColor={trackColor} 
+              isPlaying={isPlaying} 
+              eq={stem.eq || { low: 0, mid: 0, high: 0 }} 
+            />
+
+            <div className="flex flex-col sm:flex-row gap-5">
+              {/* Column 1: Primary Controls */}
             <div className="flex flex-col gap-4 w-full sm:w-1/3">
                {/* Fader */}
                <div className="bg-black/40 rounded-2xl p-4 border border-white/5 flex flex-col items-center flex-1">
@@ -715,6 +1012,7 @@ const TrackDetailsModal: React.FC<{ stem: Stem, index: number, onClose: () => vo
                 </div>
              </div>
 
+            </div>
           </div>
         </motion.div>
       </motion.div>,

@@ -20,7 +20,7 @@ export const TransportControls: React.FC = () => {
   const beatDuration = 60 / bpm;
 
   return (
-    <div className="mx-auto my-6 max-w-[95%] w-[95%] h-auto md:h-28 py-4 md:py-0 ios-glass border border-white/10 flex flex-col md:flex-row items-center justify-center md:justify-between gap-3 md:gap-4 lg:gap-16 px-4 md:px-12 relative overflow-hidden z-50 rounded-[2.25rem] shadow-2xl pb-[max(16px,env(safe-area-inset-bottom))] md:pb-0 shrink-0">
+    <div className="mx-auto my-2.5 sm:my-3 md:my-4 max-w-[95%] w-[95%] h-auto md:h-20 lg:h-24 py-2.5 md:py-0 ios-glass border border-white/10 flex flex-col md:flex-row items-center justify-center md:justify-between gap-2.5 md:gap-3 lg:gap-8 px-4 md:px-8 relative overflow-hidden z-50 rounded-2xl md:rounded-[1.75rem] shadow-2xl pb-[max(10px,env(safe-area-inset-bottom))] md:pb-0 shrink-0">
       {/* Background Glow */}
       <div className="absolute inset-0 bg-gradient-to-t from-[#00A3FF]/5 to-transparent pointer-events-none" />
 
@@ -32,7 +32,7 @@ export const TransportControls: React.FC = () => {
           onClick={toggleLoop}
           onContextMenu={(e) => handleMidiRightClick(e, 'loop', 'Loop')}
           className={cn(
-            "flex flex-col items-center justify-center gap-1 w-12 h-10 sm:w-14 sm:h-12 md:w-16 md:h-16 rounded-2xl transition-all border shrink-0",
+            "flex flex-col items-center justify-center gap-1 w-11 h-9 sm:w-13 sm:h-11 md:w-14 md:h-14 rounded-2xl transition-all border shrink-0",
             isLooping 
               ? "text-[#FFD60A] bg-[#FFD60A]/10 border-[#FFD60A]/30 shadow-[0_0_15px_rgba(255,214,10,0.15)]" 
               : "text-white/40 bg-white/5 border-transparent hover:text-white"
@@ -48,7 +48,7 @@ export const TransportControls: React.FC = () => {
           onClick={toggleInfiniteLoop}
           onContextMenu={(e) => handleMidiRightClick(e, 'infinite_loop', 'Infinite Loop')}
           className={cn(
-            "flex flex-col items-center justify-center gap-1 w-12 h-10 sm:w-14 sm:h-12 md:w-16 md:h-16 rounded-2xl transition-all border shrink-0",
+            "flex flex-col items-center justify-center gap-1 w-11 h-9 sm:w-13 sm:h-11 md:w-14 md:h-14 rounded-2xl transition-all border shrink-0",
             isInfiniteLoop 
               ? "text-[#00A3FF] bg-[#00A3FF]/10 border-[#00A3FF]/30 shadow-[0_0_15px_rgba(0,163,255,0.15)]" 
               : "text-white/40 bg-white/5 border-transparent hover:text-white"
@@ -60,7 +60,7 @@ export const TransportControls: React.FC = () => {
 
         <div className="w-[1px] h-6 bg-white/10 mx-0.5 shrink-0 md:hidden" />
 
-        <div className="flex items-center gap-0.5 sm:gap-1 md:gap-3 bg-black/40 md:bg-white/5 border border-white/5 md:border-transparent rounded-2xl p-0.5 md:p-3 shrink-0 h-10 sm:h-12 md:h-16 md:w-28 items-center justify-center">
+        <div className="flex items-center gap-0.5 sm:gap-1 md:gap-3 bg-black/40 md:bg-white/5 border border-white/5 md:border-transparent rounded-2xl p-0.5 md:p-2 shrink-0 h-9 sm:h-11 md:h-14 md:w-24 items-center justify-center">
           <motion.button 
             whileHover={{ scale: 1.15 }}
             whileTap={{ scale: 0.85 }}
@@ -93,7 +93,7 @@ export const TransportControls: React.FC = () => {
           onClick={toggleFadeOut}
           onContextMenu={(e) => handleMidiRightClick(e, 'fade_out', 'Fade Out')}
           className={cn(
-            "flex flex-col items-center justify-center gap-1 w-12 h-10 sm:w-14 sm:h-12 md:w-16 md:h-16 rounded-2xl transition-all border shrink-0",
+            "flex flex-col items-center justify-center gap-1 w-11 h-9 sm:w-13 sm:h-11 md:w-14 md:h-14 rounded-2xl transition-all border shrink-0",
             isFadeOut 
               ? "text-[#FF453A] bg-[#FF453A]/10 border-[#FF453A]/30 shadow-[0_0_15px_rgba(255,69,58,0.15)]" 
               : "text-white/40 bg-white/5 border-transparent hover:text-white"
@@ -119,7 +119,7 @@ export const TransportControls: React.FC = () => {
           whileTap={{ scale: 0.95 }}
           onClick={stop}
           onContextMenu={(e) => handleMidiRightClick(e, 'stop', 'Stop')}
-          className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 bg-white/5 border border-white/10 rounded-[1.25rem] md:rounded-[1.75rem] text-white/60 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all flex items-center justify-center shadow-lg"
+          className="w-11 h-11 sm:w-12 sm:h-12 md:w-14 md:h-14 bg-white/5 border border-white/10 rounded-xl md:rounded-[1.25rem] text-white/60 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all flex items-center justify-center shadow-lg"
         >
           <Square size={16} className="md:w-[22px] md:h-[22px]" strokeWidth={2.5} fill="currentColor" />
         </motion.button>
@@ -131,13 +131,13 @@ export const TransportControls: React.FC = () => {
           onClick={togglePlay}
           onContextMenu={(e) => handleMidiRightClick(e, 'play_pause', 'Play / Pause')}
           className={cn(
-            "w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-[1.5rem] md:rounded-[2rem] transition-all relative group focus:outline-none flex items-center justify-center border",
+            "w-14 h-14 sm:w-16 sm:h-16 md:w-18 md:h-18 rounded-2xl md:rounded-[1.5rem] transition-all relative group focus:outline-none flex items-center justify-center border",
             isPlaying 
               ? "bg-gradient-to-tr from-[#FF3B30] to-[#FF453A] border-[#FF3B30]/50 text-white shadow-[0_0_30px_rgba(255,59,48,0.45)]" 
               : "bg-gradient-to-tr from-[#34C759] to-[#30D158] border-[#34C759]/50 text-white shadow-[0_0_30px_rgba(52,199,89,0.45)]"
           )}
         >
-          <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-[1.5rem] md:rounded-[2rem]" />
+          <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl md:rounded-[1.5rem]" />
           {isPlaying ? (
             <Pause size={24} className="md:w-[32px] md:h-[32px]" strokeWidth={3} fill="currentColor" />
           ) : (
@@ -207,7 +207,7 @@ export const TransportControls: React.FC = () => {
           }}
           onContextMenu={(e) => handleMidiRightClick(e, 'tap_tempo', 'Tap Tempo')}
           className={cn(
-            "flex flex-col items-center justify-center gap-0.5 w-14 h-10 sm:w-16 sm:h-12 md:w-20 md:h-16 rounded-2xl transition-all border shrink-0",
+            "flex flex-col items-center justify-center gap-0.5 w-12 h-9 sm:w-14 sm:h-11 md:w-16 md:h-14 rounded-2xl transition-all border shrink-0",
             isTapFlashed 
               ? "bg-[#00A3FF]/30 border-[#00A3FF] text-white shadow-[0_0_20px_rgba(0,163,255,0.4)]" 
               : "text-[#00A3FF] bg-[#00A3FF]/10 border-[#00A3FF]/20 hover:bg-[#00A3FF]/15 hover:border-[#00A3FF]/30"

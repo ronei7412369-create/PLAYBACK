@@ -44,6 +44,10 @@ export interface Song {
   markers: Marker[];
   waveformPeaks?: number[]; // Extracted audio data
   lyrics?: string; // Teleprompter lyrics
+  masterVolume?: number;
+  masterEq?: { low: number; mid: number; high: number };
+  playbackRate?: number;
+  pitchShift?: number;
 }
 
 export interface PlayerState {
@@ -67,7 +71,7 @@ export interface PlayerState {
   isInfiniteLoop: boolean;
   isFadeOut: boolean;
   setlist: Song[];
-  savedSetlists: { id: string, name: string, songIds: string[] }[];
+  savedSetlists: { id: string, name: string, songIds: string[], songs?: Song[] }[];
   
   // Real-time parameters
   playbackRate: number; // Tempo

@@ -191,7 +191,7 @@ export class StorageEngine {
     });
   }
 
-  async saveSetlist(setlist: { id: string, name: string, songIds: string[] }): Promise<void> {
+  async saveSetlist(setlist: { id: string, name: string, songIds: string[], songs?: any[] }): Promise<void> {
     if (!this.db) await this.init();
     
     await new Promise<void>((resolve, reject) => {

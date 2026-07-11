@@ -12,15 +12,14 @@ import { MidiController } from './components/MidiController';
 import { MidiGlobalOverlay } from './components/MidiGlobalOverlay';
 import { MidiMapModal } from './components/MidiMapModal';
 import { cn } from './lib/utils';
-import { Sliders, Type, Grid, Music, Settings2 } from 'lucide-react';
+import { Sliders, Grid } from 'lucide-react';
 import { auth, handleRedirectResult } from './services/firebase';
 
-import { Teleprompter } from './components/Teleprompter';
 import { PadsPlayer } from './components/PadsPlayer';
 import { BackgroundAnimation } from './components/BackgroundAnimation';
 import { StemSplitter } from './components/StemSplitter';
 
-type MobileView = 'mixer' | 'teleprompter' | 'pads' | 'split';
+type MobileView = 'mixer' | 'pads';
 
 export default function App() {
   const { 
@@ -241,15 +240,6 @@ export default function App() {
                      <Sliders size={16} /> Mixer
                    </button>
                    <button 
-                     onClick={() => setMobileView('teleprompter')}
-                     className={cn(
-                       "flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold transition-all whitespace-nowrap",
-                       mobileView === 'teleprompter' ? "bg-purple-500 text-white" : "bg-white/5 text-white/50"
-                     )}
-                   >
-                     <Type size={16} /> Cifras
-                   </button>
-                   <button 
                      onClick={() => setMobileView('pads')}
                      className={cn(
                        "flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold transition-all whitespace-nowrap",
@@ -260,33 +250,20 @@ export default function App() {
                    </button>
                  </div>
 
-                 <div className={cn(
-                   "overflow-hidden shrink-0",
-                   "flex-1 sm:flex-none sm:h-[180px] lg:h-[200px] xl:h-[220px]",
-                   "sm:block transition-all",
-                   mobileView !== 'mixer' && "hidden sm:block" 
-                 )}>
-                   <Mixer />
-                 </div>
-
-                 <div className={cn(
-                   "flex-1 flex flex-col sm:flex-row gap-4 sm:px-4 pb-4 min-h-0",
-                   "overflow-hidden",
-                   (mobileView !== 'teleprompter' && mobileView !== 'pads') && "hidden sm:flex" 
-                 )}>
-                    {/* Teleprompter */}
+                 <div className="flex-1 flex flex-col sm:flex-row gap-4 sm:px-4 pb-4 min-h-0 overflow-hidden">
+                    {/* Mixer */}
                     <div className={cn(
-                      "flex-[2] rounded-none sm:rounded-[20px] ios-glass sm:border border-white/10 shadow-xl overflow-hidden group transition-all relative",
+                      "flex-1 rounded-none sm:rounded-[20px] overflow-hidden transition-all",
                       "h-full min-h-0",
                       "sm:block",
-                      mobileView !== 'teleprompter' && "hidden sm:flex"
+                      mobileView !== 'mixer' && "hidden sm:block"
                     )}>
-                       <Teleprompter />
+                       <Mixer />
                     </div>
                     
                     {/* Pads */}
                     <div className={cn(
-                      "flex-none w-full sm:w-[360px] rounded-[20px] ios-glass border border-white/10 shadow-xl overflow-hidden p-3",
+                      "flex-none w-full sm:w-[360px] rounded-none sm:rounded-[20px] ios-glass sm:border border-white/10 shadow-xl overflow-hidden p-3",
                       "min-h-[350px] sm:min-h-0 sm:h-full",
                       "sm:block",
                       mobileView !== 'pads' && "hidden sm:block"

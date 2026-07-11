@@ -236,25 +236,49 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
           storageEngine.saveSong({...song, duration: maxDuration}, []).catch(() => {});
        }
        
-       // Force eq re-application
+       // Force eq and compressor re-application with defaults/fallbacks to prevent leakage
+       const hasAnySolo = song.stems?.some(s => s.isSoloed) ?? false;
        if (song.stems) {
          for (const stem of song.stems) {
-           if (stem.eq) {
-             audioEngine.setStemEQ(stem.id, 'low', stem.eq.low);
-             audioEngine.setStemEQ(stem.id, 'mid', stem.eq.mid);
-             audioEngine.setStemEQ(stem.id, 'high', stem.eq.high);
+           // Calculate proper volume based on solo and mute states
+           let activeVolume = stem.volume;
+           if (hasAnySolo) {
+             activeVolume = stem.isSoloed ? stem.volume : 0;
+           } else if (stem.isMuted) {
+             activeVolume = 0;
            }
-           if (stem.compressor) {
-             audioEngine.setStemCompressor(
-               stem.id,
-               stem.compressor.enabled,
-               stem.compressor.threshold,
-               stem.compressor.ratio,
-               stem.compressor.attack,
-               stem.compressor.release,
-               stem.compressor.makeupGain
-             );
-           }
+           audioEngine.setStemVolume(stem.id, activeVolume);
+           
+           // Apply panning based on output and isLRSplit
+           const pan = get().isLRSplit ? (stem.output === 1 ? -1 : stem.output === 2 ? 1 : 0) : 0;
+           audioEngine.setStemPan(stem.id, pan);
+
+           // EQ configuration (using defaults if missing)
+           const low = stem.eq?.low ?? 0;
+           const mid = stem.eq?.mid ?? 0;
+           const high = stem.eq?.high ?? 0;
+           audioEngine.setStemEQ(stem.id, 'low', low);
+           audioEngine.setStemEQ(stem.id, 'mid', mid);
+           audioEngine.setStemEQ(stem.id, 'high', high);
+
+           // Compressor configuration (using bypassed default if missing)
+           const comp = stem.compressor ?? {
+             enabled: false,
+             threshold: -24,
+             ratio: 4,
+             attack: 0.003,
+             release: 0.25,
+             makeupGain: 0
+           };
+           audioEngine.setStemCompressor(
+             stem.id,
+             comp.enabled,
+             comp.threshold,
+             comp.ratio,
+             comp.attack,
+             comp.release,
+             comp.makeupGain
+           );
          }
        }
     } catch (e) {
@@ -271,9 +295,29 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
     }
     audioEngine.clearDecodeCache(Array.from(keepStemIds));
 
-    set({ currentSong: song, currentTime: 0, isPlaying: false, playbackRate: 1.0, isLoadingSong: false, pitchShift: 0 });
-    audioEngine.setPlaybackRate(1.0);
-    audioEngine.setPitchShift(0);
+    // Load song-specific mastering and global settings
+    const targetMasterVolume = song.masterVolume !== undefined ? song.masterVolume : 0.5;
+    const targetMasterEq = song.masterEq || { low: 0, mid: 0, high: 0 };
+    const targetPlaybackRate = song.playbackRate !== undefined ? song.playbackRate : 1.0;
+    const targetPitchShift = song.pitchShift !== undefined ? song.pitchShift : 0;
+
+    audioEngine.setMasterVolume(targetMasterVolume);
+    audioEngine.setMasterEQ('low', targetMasterEq.low);
+    audioEngine.setMasterEQ('mid', targetMasterEq.mid);
+    audioEngine.setMasterEQ('high', targetMasterEq.high);
+    audioEngine.setPlaybackRate(targetPlaybackRate);
+    audioEngine.setPitchShift(targetPitchShift);
+
+    set({ 
+      currentSong: song, 
+      currentTime: 0, 
+      isPlaying: false, 
+      playbackRate: targetPlaybackRate, 
+      isLoadingSong: false, 
+      pitchShift: targetPitchShift,
+      masterVolume: targetMasterVolume,
+      masterEq: targetMasterEq
+    });
   },
 
   preloadSong: async (songId) => {
@@ -338,22 +382,65 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
 
   setMasterVolume: (volume) => {
     audioEngine.setMasterVolume(volume);
-    set({ masterVolume: volume });
+    set((state) => {
+      if (!state.currentSong) return { masterVolume: volume };
+      const updatedSong = { ...state.currentSong, masterVolume: volume };
+      const updatedSetlist = state.setlist.map(s => s.id === updatedSong.id ? updatedSong : s);
+      storageEngine.saveSong(updatedSong, []).catch(console.error);
+      return {
+        masterVolume: volume,
+        currentSong: updatedSong,
+        setlist: updatedSetlist
+      };
+    });
   },
 
   setMasterEQ: (band, value) => {
     audioEngine.setMasterEQ(band, value);
-    set((state) => ({ masterEq: { ...state.masterEq, [band]: value } }));
+    set((state) => {
+      const currentEq = state.masterEq || { low: 0, mid: 0, high: 0 };
+      const newMasterEq = { ...currentEq, [band]: value };
+      if (!state.currentSong) return { masterEq: newMasterEq };
+      
+      const updatedSong = { ...state.currentSong, masterEq: newMasterEq };
+      const updatedSetlist = state.setlist.map(s => s.id === updatedSong.id ? updatedSong : s);
+      storageEngine.saveSong(updatedSong, []).catch(console.error);
+      return {
+        masterEq: newMasterEq,
+        currentSong: updatedSong,
+        setlist: updatedSetlist
+      };
+    });
   },
 
   setPlaybackRate: (rate) => {
     audioEngine.setPlaybackRate(rate);
-    set({ playbackRate: rate });
+    set((state) => {
+      if (!state.currentSong) return { playbackRate: rate };
+      const updatedSong = { ...state.currentSong, playbackRate: rate };
+      const updatedSetlist = state.setlist.map(s => s.id === updatedSong.id ? updatedSong : s);
+      storageEngine.saveSong(updatedSong, []).catch(console.error);
+      return {
+        playbackRate: rate,
+        currentSong: updatedSong,
+        setlist: updatedSetlist
+      };
+    });
   },
 
   setPitchShift: (semitones) => {
     audioEngine.setPitchShift(semitones);
-    set({ pitchShift: semitones });
+    set((state) => {
+      if (!state.currentSong) return { pitchShift: semitones };
+      const updatedSong = { ...state.currentSong, pitchShift: semitones };
+      const updatedSetlist = state.setlist.map(s => s.id === updatedSong.id ? updatedSong : s);
+      storageEngine.saveSong(updatedSong, []).catch(console.error);
+      return {
+        pitchShift: semitones,
+        currentSong: updatedSong,
+        setlist: updatedSetlist
+      };
+    });
   },
 
   toggleMetronome: () => {
@@ -474,12 +561,20 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
   
   updateStemVolume: (stemId, volume) => {
     audioEngine.setStemVolume(stemId, volume);
-    set((state) => ({
-      currentSong: state.currentSong ? {
-        ...state.currentSong,
-        stems: state.currentSong.stems.map(s => s.id === stemId ? { ...s, volume } : s)
-      } : null
-    }));
+    set((state) => {
+      if (!state.currentSong) return {};
+      const updatedStems = state.currentSong.stems.map(s => s.id === stemId ? { ...s, volume } : s);
+      const updatedSong = { ...state.currentSong, stems: updatedStems };
+      const updatedSetlist = state.setlist.map(s => s.id === updatedSong.id ? updatedSong : s);
+      
+      // Async update database
+      storageEngine.saveSong(updatedSong, []).catch(console.error);
+
+      return {
+        currentSong: updatedSong,
+        setlist: updatedSetlist
+      };
+    });
   },
   
   resetAllVolumesToZeroDb: () => {
@@ -494,14 +589,22 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
         }
       });
       
-      set((state) => ({
-        masterVolume: 0.5,
-        padVolume: 0.5,
-        currentSong: state.currentSong ? {
-          ...state.currentSong,
-          stems: state.currentSong.stems.map(s => ({ ...s, volume: 0.5 }))
-        } : null
-      }));
+      set((state) => {
+        if (!state.currentSong) return {};
+        const updatedStems = state.currentSong.stems.map(s => ({ ...s, volume: 0.5 }));
+        const updatedSong = { ...state.currentSong, stems: updatedStems };
+        const updatedSetlist = state.setlist.map(s => s.id === updatedSong.id ? updatedSong : s);
+        
+        // Async update database
+        storageEngine.saveSong(updatedSong, []).catch(console.error);
+
+        return {
+          masterVolume: 0.5,
+          padVolume: 0.5,
+          currentSong: updatedSong,
+          setlist: updatedSetlist
+        };
+      });
     } else {
       set({
         masterVolume: 0.5,
@@ -517,25 +620,31 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
     if (stem) {
       audioEngine.setStemVolume(stemId, !stem.isMuted ? 0 : stem.volume);
     }
-    set((state) => ({
-      currentSong: state.currentSong ? {
-        ...state.currentSong,
-        stems: state.currentSong.stems.map(s => s.id === stemId ? { ...s, isMuted: !s.isMuted } : s)
-      } : null
-    }));
+    set((state) => {
+      if (!state.currentSong) return {};
+      const updatedStems = state.currentSong.stems.map(s => s.id === stemId ? { ...s, isMuted: !s.isMuted } : s);
+      const updatedSong = { ...state.currentSong, stems: updatedStems };
+      const updatedSetlist = state.setlist.map(s => s.id === updatedSong.id ? updatedSong : s);
+      
+      // Async update database
+      storageEngine.saveSong(updatedSong, []).catch(console.error);
+
+      return {
+        currentSong: updatedSong,
+        setlist: updatedSetlist
+      };
+    });
   },
   
   toggleStemSolo: (stemId) => set((state) => {
     if (!state.currentSong) return state;
     const isCurrentlySoloed = state.currentSong.stems.find(s => s.id === stemId)?.isSoloed;
-    const newState = {
-      currentSong: {
-        ...state.currentSong,
-        stems: state.currentSong.stems.map(s => s.id === stemId ? { ...s, isSoloed: !isCurrentlySoloed } : s)
-      }
+    const updatedSong = {
+      ...state.currentSong,
+      stems: state.currentSong.stems.map(s => s.id === stemId ? { ...s, isSoloed: !isCurrentlySoloed } : s)
     };
     
-    const stems = newState.currentSong.stems;
+    const stems = updatedSong.stems;
     const hasAnySolo = stems.some(s => s.isSoloed);
     
     stems.forEach(s => {
@@ -548,7 +657,13 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
       audioEngine.setStemVolume(s.id, finalVolume);
     });
 
-    return newState;
+    const updatedSetlist = state.setlist.map(s => s.id === updatedSong.id ? updatedSong : s);
+
+    // Keep state and setlist in sync
+    return {
+      currentSong: updatedSong,
+      setlist: updatedSetlist
+    };
   }),
   
   login: async () => {
@@ -599,47 +714,80 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
     const pan = isLRSplit ? (output === 1 ? -1 : output === 2 ? 1 : 0) : 0;
     audioEngine.setStemPan(stemId, pan);
 
-    set((state) => ({
-      currentSong: state.currentSong ? {
-        ...state.currentSong,
-        stems: state.currentSong.stems.map(s => s.id === stemId ? { ...s, output } : s)
-      } : null
-    }));
+    set((state) => {
+      if (!state.currentSong) return {};
+      const updatedStems = state.currentSong.stems.map(s => s.id === stemId ? { ...s, output, pan } : s);
+      const updatedSong = { ...state.currentSong, stems: updatedStems };
+      const updatedSetlist = state.setlist.map(s => s.id === updatedSong.id ? updatedSong : s);
+      
+      // Async update database
+      storageEngine.saveSong(updatedSong, []).catch(console.error);
+
+      return {
+        currentSong: updatedSong,
+        setlist: updatedSetlist
+      };
+    });
   },
 
   setStemEQ: (stemId, band, value) => {
     audioEngine.setStemEQ(stemId, band, value);
-    set((state) => ({
-      currentSong: state.currentSong ? {
-        ...state.currentSong,
-        stems: state.currentSong.stems.map(s => 
-          s.id === stemId ? { ...s, eq: { ...(s.eq || { low: 0, mid: 0, high: 0 }), [band]: value } } : s
-        )
-      } : null
-    }));
+    set((state) => {
+      if (!state.currentSong) return {};
+      const updatedStems = state.currentSong.stems.map(s => 
+        s.id === stemId ? { ...s, eq: { ...(s.eq || { low: 0, mid: 0, high: 0 }), [band]: value } } : s
+      );
+      const updatedSong = { ...state.currentSong, stems: updatedStems };
+      const updatedSetlist = state.setlist.map(s => s.id === updatedSong.id ? updatedSong : s);
+      
+      // Async update database
+      storageEngine.saveSong(updatedSong, []).catch(console.error);
+
+      return {
+        currentSong: updatedSong,
+        setlist: updatedSetlist
+      };
+    });
   },
 
   setStemCompressor: (stemId, enabled, threshold, ratio, attack, release, makeupGain) => {
     audioEngine.setStemCompressor(stemId, enabled, threshold, ratio, attack, release, makeupGain);
-    set((state) => ({
-      currentSong: state.currentSong ? {
-        ...state.currentSong,
-        stems: state.currentSong.stems.map(s => 
-          s.id === stemId ? { 
-            ...s, 
-            compressor: { enabled, threshold, ratio, attack, release, makeupGain } 
-          } : s
-        )
-      } : null
-    }));
+    set((state) => {
+      if (!state.currentSong) return {};
+      const updatedStems = state.currentSong.stems.map(s => 
+        s.id === stemId ? { 
+          ...s, 
+          compressor: { enabled, threshold, ratio, attack, release, makeupGain } 
+        } : s
+      );
+      const updatedSong = { ...state.currentSong, stems: updatedStems };
+      const updatedSetlist = state.setlist.map(s => s.id === updatedSong.id ? updatedSong : s);
+      
+      // Async update database
+      storageEngine.saveSong(updatedSong, []).catch(console.error);
+
+      return {
+        currentSong: updatedSong,
+        setlist: updatedSetlist
+      };
+    });
   },
 
   updateSongMetadata: (id, title, artist) => {
     set((state) => {
        const updatedSetlist = state.setlist.map(s => s.id === id ? { ...s, title, artist } : s);
+       const updatedSong = state.currentSong?.id === id ? { ...state.currentSong, title, artist } : state.currentSong;
+       
+       if (updatedSong) {
+         storageEngine.saveSong(updatedSong, []).catch(console.error);
+       } else {
+         const foundSong = updatedSetlist.find(s => s.id === id);
+         if (foundSong) storageEngine.saveSong(foundSong, []).catch(console.error);
+       }
+
        return {
          setlist: updatedSetlist,
-         currentSong: state.currentSong?.id === id ? { ...state.currentSong, title, artist } : state.currentSong
+         currentSong: updatedSong
        };
     });
   },
@@ -647,9 +795,18 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
   updateSongLyrics: (id, lyrics) => {
     set((state) => {
        const updatedSetlist = state.setlist.map(s => s.id === id ? { ...s, lyrics } : s);
+       const updatedSong = state.currentSong?.id === id ? { ...state.currentSong, lyrics } : state.currentSong;
+       
+       if (updatedSong) {
+         storageEngine.saveSong(updatedSong, []).catch(console.error);
+       } else {
+         const foundSong = updatedSetlist.find(s => s.id === id);
+         if (foundSong) storageEngine.saveSong(foundSong, []).catch(console.error);
+       }
+
        return {
          setlist: updatedSetlist,
-         currentSong: state.currentSong?.id === id ? { ...state.currentSong, lyrics } : state.currentSong
+         currentSong: updatedSong
        };
     });
   },
@@ -671,10 +828,35 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
     const { setlist, savedSetlists } = get();
     if (setlist.length === 0) return;
     
+    // Explicitly save/update all current songs in the setlist to ensure all EQ and volume settings are persisted!
+    for (const song of setlist) {
+      try {
+        await storageEngine.saveSong(song, []);
+      } catch (e) {
+        console.error("Failed to persist song on playlist save", e);
+      }
+    }
+
+    // Build a complete snapshot of songs in the setlist preserving references
+    const songsSnapshot = setlist.map(song => ({
+      ...song,
+      stems: song.stems.map(stem => ({
+        ...stem,
+        originalFile: stem.originalFile,
+        buffer: stem.buffer,
+        eq: stem.eq ? { ...stem.eq } : undefined,
+        compressor: stem.compressor ? { ...stem.compressor } : undefined
+      })),
+      markers: song.markers.map(marker => ({ ...marker })),
+      waveformPeaks: song.waveformPeaks ? [...song.waveformPeaks] : undefined,
+      masterEq: song.masterEq ? { ...song.masterEq } : undefined
+    }));
+
     const newSetlist = {
       id: Math.random().toString(36).substr(2, 9),
       name,
-      songIds: setlist.map(s => s.id)
+      songIds: setlist.map(s => s.id),
+      songs: songsSnapshot
     };
     
     try {
@@ -691,15 +873,20 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
     if (!targetSetlist) return;
     
     try {
-      const allSongs = await storageEngine.loadSongs();
-      const loadedSongs = targetSetlist.songIds
-        .map(songId => allSongs.find(s => s.id === songId))
-        .filter(s => !!s); // filter out if missing for some reason
+      let loadedSongs: Song[] = [];
+      if (targetSetlist.songs && targetSetlist.songs.length > 0) {
+        loadedSongs = targetSetlist.songs;
+      } else {
+        const allSongs = await storageEngine.loadSongs();
+        loadedSongs = targetSetlist.songIds
+          .map(songId => allSongs.find(s => s.id === songId))
+          .filter(s => !!s) as Song[];
+      }
         
-      set({ setlist: loadedSongs as any });
+      set({ setlist: loadedSongs });
       
       if (loadedSongs.length > 0) {
-        get().setCurrentSong(loadedSongs[0]);
+        await get().setCurrentSong(loadedSongs[0]);
       }
     } catch (e) {
       console.error("Failed to load setlist songs", e);
