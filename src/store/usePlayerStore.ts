@@ -18,25 +18,43 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
     const isAdmin = user ? adminEmails.includes(user.email || "") : false;
 
     if (!user) {
-      set({ isAuthenticated: false, user: null, isAdmin: false, hasAccess: false });
+      audioEngine.pause();
+      audioEngine.clearStems();
+      set({ 
+        isAuthenticated: false, 
+        user: null, 
+        isAdmin: false, 
+        hasAccess: false,
+        setlist: [],
+        savedSetlists: [],
+        currentSong: null,
+        isPlaying: false,
+        currentTime: 0,
+        preloadingSongId: null,
+        preloadedSongIds: [],
+        customPads: {},
+        activePadKey: null
+      });
       return;
     }
 
     const doSync = async () => {
-      await storageEngine.syncFromCloud();
-      const [savedSongs, savedSetlists] = await Promise.all([
-        storageEngine.loadSongs(),
-        storageEngine.loadSetlists().catch(() => [])
-      ]);
-      const newState: any = {};
-      if (savedSongs && savedSongs.length > 0) {
-        newState.setlist = savedSongs;
-      }
-      if (savedSetlists && savedSetlists.length > 0) {
-        newState.savedSetlists = savedSetlists;
-      }
-      if (Object.keys(newState).length > 0) {
-        set(newState);
+      try {
+        await storageEngine.init(user.uid);
+        await storageEngine.syncFromCloud();
+        const [savedSongs, savedSetlists] = await Promise.all([
+          storageEngine.loadSongs(),
+          storageEngine.loadSetlists().catch(() => [])
+        ]);
+        set({
+          setlist: savedSongs || [],
+          savedSetlists: savedSetlists || []
+        });
+        if (get() && typeof get().loadCustomPads === 'function') {
+          get().loadCustomPads();
+        }
+      } catch (e) {
+        console.error("Sync error during auth state change:", e);
       }
     };
 
@@ -84,6 +102,7 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
   user: null,
   isStageMode: false,
   isLoadingSong: false,
+  isSavingSetlist: false,
   isSidebarOpen: false,
   preloadingSongId: null,
   preloadedSongIds: [],
@@ -109,6 +128,8 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
 
   initPersistence: async () => {
     try {
+      const activeUserId = auth.currentUser?.uid;
+      await storageEngine.init(activeUserId);
       const [savedSongs, savedSetlists] = await Promise.all([
         storageEngine.loadSongs(),
         storageEngine.loadSetlists().catch(() => [])
@@ -691,9 +712,9 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
       throw e; // Maybe front end needs to catch it to show error
     }
   },
-  signUpWithEmail: async (email, password) => {
+  signUpWithEmail: async (email, password, displayName) => {
     try {
-      await signUpWithEmail(email, password);
+      await signUpWithEmail(email, password, displayName);
     } catch (e) {
       console.error("Sign up failed", e);
       throw e;
@@ -861,42 +882,55 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
     const { setlist, savedSetlists } = get();
     if (setlist.length === 0) return;
     
-    // Explicitly save/update all current songs in the setlist to ensure all EQ and volume settings are persisted!
-    for (const song of setlist) {
-      try {
-        await storageEngine.saveSong(song, []);
-      } catch (e) {
-        console.error("Failed to persist song on playlist save", e);
-      }
-    }
-
-    // Build a complete snapshot of songs in the setlist preserving references
-    const songsSnapshot = setlist.map(song => ({
-      ...song,
-      stems: song.stems.map(stem => ({
-        ...stem,
-        originalFile: stem.originalFile,
-        buffer: stem.buffer,
-        eq: stem.eq ? { ...stem.eq } : undefined,
-        compressor: stem.compressor ? { ...stem.compressor } : undefined
-      })),
-      markers: song.markers.map(marker => ({ ...marker })),
-      waveformPeaks: song.waveformPeaks ? [...song.waveformPeaks] : undefined,
-      masterEq: song.masterEq ? { ...song.masterEq } : undefined
-    }));
-
-    const newSetlist = {
-      id: Math.random().toString(36).substr(2, 9),
-      name,
-      songIds: setlist.map(s => s.id),
-      songs: songsSnapshot
-    };
+    set({ isSavingSetlist: true });
     
     try {
+      // Explicitly save/update all current songs in the setlist to ensure all EQ, volume settings and STEM BUFFERS are persisted to local DB & cloud!
+      for (const song of setlist) {
+        try {
+          const stemsData: { id: string; buffer: ArrayBuffer }[] = [];
+          for (const stem of song.stems) {
+            const buffer = await storageEngine.loadStemBuffer(stem.id);
+            if (buffer) {
+              stemsData.push({ id: stem.id, buffer });
+            }
+          }
+          await storageEngine.saveSong(song, stemsData);
+        } catch (e) {
+          console.error("Failed to persist song/stems on playlist save", e);
+          // Fallback to just saving metadata if buffer load fails
+          await storageEngine.saveSong(song, []);
+        }
+      }
+
+      // Build a complete snapshot of songs in the setlist preserving references
+      const songsSnapshot = setlist.map(song => ({
+        ...song,
+        stems: song.stems.map(stem => ({
+          ...stem,
+          originalFile: stem.originalFile,
+          buffer: stem.buffer,
+          eq: stem.eq ? { ...stem.eq } : undefined,
+          compressor: stem.compressor ? { ...stem.compressor } : undefined
+        })),
+        markers: song.markers.map(marker => ({ ...marker })),
+        waveformPeaks: song.waveformPeaks ? [...song.waveformPeaks] : undefined,
+        masterEq: song.masterEq ? { ...song.masterEq } : undefined
+      }));
+
+      const newSetlist = {
+        id: Math.random().toString(36).substr(2, 9),
+        name,
+        songIds: setlist.map(s => s.id),
+        songs: songsSnapshot
+      };
+      
       await storageEngine.saveSetlist(newSetlist);
       set({ savedSetlists: [...savedSetlists, newSetlist] });
     } catch (e) {
       console.error("Failed to save setlist", e);
+    } finally {
+      set({ isSavingSetlist: false });
     }
   },
 

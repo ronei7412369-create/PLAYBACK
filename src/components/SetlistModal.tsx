@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { usePlayerStore } from '../store/usePlayerStore';
-import { X, Save, FolderOpen, Trash2, ListMusic } from 'lucide-react';
+import { X, Save, FolderOpen, Trash2, ListMusic, Loader } from 'lucide-react';
 
 export const SetlistModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
-  const { savedSetlists, saveCurrentSetlist, loadSavedSetlist, deleteSavedSetlist, setlist } = usePlayerStore();
+  const { savedSetlists, saveCurrentSetlist, loadSavedSetlist, deleteSavedSetlist, setlist, isSavingSetlist } = usePlayerStore();
   const [activeTab, setActiveTab] = useState<'load' | 'save'>('load');
   const [newSetName, setNewSetName] = useState('');
 
@@ -108,7 +108,8 @@ export const SetlistModal: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                       type="text"
                       value={newSetName}
                       onChange={e => setNewSetName(e.target.value)}
-                      className="w-full bg-black/50 border border-white/10 rounded-xl py-4 px-4 text-white focus:outline-none focus:border-[#00A3FF] transition-colors"
+                      disabled={isSavingSetlist}
+                      className="w-full bg-black/50 border border-white/10 rounded-xl py-4 px-4 text-white focus:outline-none focus:border-[#00A3FF] transition-colors disabled:opacity-50"
                       placeholder="Ex: Culto de Domingo"
                       required
                     />
@@ -116,10 +117,20 @@ export const SetlistModal: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                   
                   <button
                     type="submit"
-                    disabled={setlist.length === 0 || !newSetName.trim()}
-                    className="w-full mt-4 py-4 rounded-xl font-black text-sm transition-all bg-[#00A3FF] text-white hover:bg-[#0088CC] disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={setlist.length === 0 || !newSetName.trim() || isSavingSetlist}
+                    className="w-full mt-4 py-4 rounded-xl font-black text-sm transition-all bg-[#00A3FF] text-white hover:bg-[#0088CC] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-[#00A3FF]/20"
                   >
-                    Salvar Setlist
+                    {isSavingSetlist ? (
+                      <>
+                        <Loader size={18} className="animate-spin text-white" />
+                        <span>Sincronizando com a Nuvem...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save size={18} />
+                        <span>Salvar Setlist</span>
+                      </>
+                    )}
                   </button>
                 </form>
               )}

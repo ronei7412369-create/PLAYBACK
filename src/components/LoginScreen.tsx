@@ -1,28 +1,34 @@
 import React, { useState } from 'react';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { motion } from 'motion/react';
-import { Mail, Lock } from 'lucide-react';
+import { Mail, Lock, User } from 'lucide-react';
 import { BackgroundAnimation } from './BackgroundAnimation';
 import { AnimatedLogo } from './AnimatedLogo';
 
 export const LoginScreen: React.FC = () => {
-  const { login, loginWithEmail } = usePlayerStore();
+  const { login, loginWithEmail, signUpWithEmail } = usePlayerStore();
+  const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
   const handleGoogleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isLoading) return;
     setIsLoading(true);
+    setError('');
     try {
       // Create a timeout promise that doesn't reject, but just resolves to "timeout"
       const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('timeout'), 15000));
       const result = await Promise.race([login(), timeoutPromise]);
       
       if (result === 'timeout') {
-         alert("O login com Google demorou muito para responder. Isso pode acontecer devido a bloqueadores de pop-up. Tente usar 'Entrar com Email' ou acesse o aplicativo em uma nova aba.");
+         setError("O login com Google demorou muito para responder. Isso pode acontecer devido a bloqueadores de pop-up. Tente usar 'Entrar com Email' ou acesse o aplicativo em uma nova aba.");
       }
+    } catch (err: any) {
+      setError(err?.message || "Ocorreu um erro ao fazer login com o Google.");
     } finally {
       setIsLoading(false);
     }
@@ -33,8 +39,29 @@ export const LoginScreen: React.FC = () => {
     if (!email || !password || isLoading) return;
     
     setIsLoading(true);
+    setError('');
     try {
-      if (loginWithEmail) await loginWithEmail(email, password);
+      if (isSignUp) {
+        if (signUpWithEmail) {
+          await signUpWithEmail(email, password, displayName);
+        }
+      } else {
+        if (loginWithEmail) {
+          await loginWithEmail(email, password);
+        }
+      }
+    } catch (err: any) {
+      let friendlyError = err?.message || "Ocorreu um erro ao processar a autenticação.";
+      if (err?.code === 'auth/email-already-in-use') {
+        friendlyError = "Este email já está sendo utilizado por outra conta.";
+      } else if (err?.code === 'auth/weak-password') {
+        friendlyError = "A senha deve ter pelo menos 6 caracteres.";
+      } else if (err?.code === 'auth/invalid-credential' || err?.code === 'auth/user-not-found' || err?.code === 'auth/wrong-password') {
+        friendlyError = "Credenciais incorretas. Por favor, verifique seus dados.";
+      } else if (err?.code === 'auth/invalid-email') {
+        friendlyError = "Por favor, insira um endereço de email válido.";
+      }
+      setError(friendlyError);
     } finally {
       setIsLoading(false);
     }
@@ -45,11 +72,11 @@ export const LoginScreen: React.FC = () => {
       <BackgroundAnimation />
       <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-[#050505] pointer-events-none" />
 
-      <div className="relative z-10 flex flex-col items-center justify-center w-full h-full max-w-md mx-auto px-6">
+      <div className="relative z-10 flex flex-col items-center justify-center w-full h-full max-w-md mx-auto px-6 overflow-y-auto">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col items-center gap-4 mb-12"
+          className="flex flex-col items-center gap-4 mb-6 mt-4 shrink-0"
         >
           <AnimatedLogo size="lg" />
           <div className="flex flex-col items-center mt-2">
@@ -61,10 +88,40 @@ export const LoginScreen: React.FC = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="w-full bg-[#0A0A0B]/80 backdrop-blur-2xl border border-white/10 rounded-3xl p-8 flex flex-col gap-6 shadow-2xl"
+          className="w-full bg-[#0A0A0B]/80 backdrop-blur-2xl border border-white/10 rounded-3xl p-8 flex flex-col gap-5 shadow-2xl shrink-0 mb-4"
         >
+          <div className="flex flex-col gap-1 text-center">
+            <h2 className="text-xl font-black tracking-tight">{isSignUp ? "Criar Nova Conta" : "Fazer Login"}</h2>
+            <p className="text-xs text-white/45">
+              {isSignUp ? "Registre-se para ter seu setlist individual" : "Entre para acessar seus multitracks"}
+            </p>
+          </div>
+
+          {error && (
+            <div className="bg-red-500/15 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-xs font-semibold text-center">
+              {error}
+            </div>
+          )}
+
           {/* Email Auth Form */}
           <form onSubmit={handleEmailAuth} className="flex flex-col gap-4">
+            {isSignUp && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] uppercase font-black tracking-widest text-white/40 ml-1">Nome / Ministério</label>
+                <div className="relative">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" size={18} />
+                  <input 
+                    type="text"
+                    value={displayName}
+                    onChange={e => setDisplayName(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:border-[#00A3FF] focus:bg-white/10 transition-all font-medium"
+                    placeholder="Seu nome ou ministério"
+                    required={isSignUp}
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] uppercase font-black tracking-widest text-white/40 ml-1">Email</label>
               <div className="relative">
@@ -99,13 +156,37 @@ export const LoginScreen: React.FC = () => {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               type="submit"
-              className="w-full bg-[#00A3FF] hover:bg-[#0090FF] text-white font-black tracking-widest uppercase py-4 rounded-xl mt-2 shadow-[0_0_20px_rgba(0,163,255,0.3)] transition-all"
+              disabled={isLoading}
+              className="w-full bg-[#00A3FF] hover:bg-[#0090FF] text-white font-black tracking-widest uppercase py-4 rounded-xl mt-2 shadow-[0_0_20px_rgba(0,163,255,0.3)] transition-all flex items-center justify-center disabled:opacity-75 disabled:cursor-not-allowed"
             >
-              Entrar com Email
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>Carregando...</span>
+                </div>
+              ) : (
+                <span>{isSignUp ? "Criar Minha Conta" : "Entrar com Email"}</span>
+              )}
             </motion.button>
           </form>
 
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-4">
+            <button 
+              type="button"
+              onClick={() => {
+                setIsSignUp(!isSignUp);
+                setError('');
+              }}
+              className="text-xs text-center text-white/50 hover:text-white transition-all underline font-semibold cursor-pointer"
+            >
+              {isSignUp ? "Já tem uma conta? Faça Login" : "Não tem uma conta? Cadastre-se"}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-4 py-1">
             <div className="h-[1px] flex-1 bg-white/10"></div>
             <span className="text-[10px] uppercase tracking-widest text-white/40 font-black">OU</span>
             <div className="h-[1px] flex-1 bg-white/10"></div>
@@ -117,7 +198,7 @@ export const LoginScreen: React.FC = () => {
             whileTap={{ scale: !isLoading ? 0.98 : 1 }}
             onClick={handleGoogleLogin}
             disabled={isLoading}
-            className={`w-full flex items-center justify-center gap-3 bg-white text-black font-black tracking-widest uppercase py-4 rounded-xl shadow-lg transition-all ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+            className={`w-full flex items-center justify-center gap-3 bg-white text-black font-black tracking-widest uppercase py-3.5 rounded-xl shadow-lg transition-all ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
           >
             {isLoading ? (
               <>
@@ -129,7 +210,7 @@ export const LoginScreen: React.FC = () => {
               </>
             ) : (
               <>
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="w-6 h-6">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="w-5 h-5">
                   <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
                   <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
                   <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>

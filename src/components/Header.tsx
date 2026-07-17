@@ -18,7 +18,7 @@ const AVAILABLE_KEYS = [
 ];
 
 export const Header: React.FC = () => {
-  const { currentSong, globalBpm, masterVolume, setMasterVolume, masterEq, setMasterEQ, isPlaying, toggleMetronome, metronomeEnabled, isLRSplit, toggleLRSplit, isStageMode, toggleStageMode, logout, isSidebarOpen, setShowSidebar, tapTempo, updateBpm, cycleTimeSignature, pitchShift, setPitchShift, isAdmin, updateSongKey } = usePlayerStore();
+  const { currentSong, globalBpm, masterVolume, setMasterVolume, masterEq, setMasterEQ, isPlaying, toggleMetronome, metronomeEnabled, isLRSplit, toggleLRSplit, isStageMode, toggleStageMode, logout, isSidebarOpen, setShowSidebar, tapTempo, updateBpm, cycleTimeSignature, pitchShift, setPitchShift, isAdmin, updateSongKey, user } = usePlayerStore();
   const [showEq, setShowEq] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [showMidiMap, setShowMidiMap] = useState(false);
@@ -162,21 +162,21 @@ export const Header: React.FC = () => {
   };
 
   return (
-    <header className="mx-auto mt-4 mb-2 max-w-[96%] w-[96%] h-16 md:h-20 ios-glass rounded-2xl md:rounded-3xl flex items-center justify-between px-3 md:px-6 z-50 sticky top-4 transition-all duration-300">
-      <div className="flex items-center gap-2 md:gap-4 shrink-0 pr-4">
+    <header className="mx-auto mt-4 mb-2 max-w-[96%] w-[96%] h-16 md:h-20 ios-glass rounded-2xl md:rounded-3xl flex items-center justify-between px-2 sm:px-3 md:px-6 z-50 sticky top-4 transition-all duration-300">
+      <div className="flex items-center gap-1.5 md:gap-4 shrink pr-1 md:pr-4 min-w-0">
         
         {/* Mobile menu toggle */}
         <button 
-          className="lg:hidden p-2.5 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white rounded-xl transition-all duration-200 shrink-0"
+          className="lg:hidden p-2 md:p-2.5 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white rounded-xl transition-all duration-200 shrink-0"
           onClick={() => setShowSidebar(!isSidebarOpen)}
         >
-          <Menu size={20} className="md:w-5 md:h-5" />
+          <Menu size={18} className="md:w-5 md:h-5" />
         </button>
 
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
-          className="flex items-center gap-2 md:gap-3 shrink-0"
+          className="flex items-center gap-1.5 md:gap-3 shrink-0"
         >
           <div className="relative group">
             <AnimatedLogo size="sm" />
@@ -188,20 +188,20 @@ export const Header: React.FC = () => {
         </motion.div>
         
         {/* Yellow Box equivalent: Stem Splitter */}
-        <div className="hidden lg:block ml-4">
+        <div className="hidden xl:block ml-4 shrink-0">
            <StemSplitter />
         </div>
       </div>
 
-      <div className="flex items-center gap-2 md:gap-4 lg:gap-6 shrink-0">
+      <div className="flex items-center gap-1.5 md:gap-4 lg:gap-6 shrink min-w-0 justify-end">
         {deferredPrompt && (
           <button
             onClick={handleInstallClick}
-            className="flex items-center gap-1.5 md:gap-2 bg-white/10 hover:bg-white/15 text-white px-2.5 py-1.5 md:px-4 md:py-2 rounded-full text-[10px] md:text-xs font-bold transition-all border border-white/10 shadow-lg"
+            className="flex items-center justify-center gap-1 md:gap-2 bg-[#00A3FF]/20 hover:bg-[#00A3FF]/30 text-white p-2 sm:px-3 sm:py-1.5 md:px-4 md:py-2 rounded-xl text-[10px] md:text-xs font-bold transition-all border border-[#00A3FF]/30 shadow-lg shrink-0"
+            title="Instalar App"
           >
-            <Download size={13} className="w-3 h-3 md:w-3.5 md:h-3.5 text-[#00A3FF]" />
+            <Download size={14} className="text-[#00A3FF]" />
             <span className="hidden sm:inline">Instalar App</span>
-            <span className="inline sm:hidden">Instalar</span>
           </button>
         )}
 
@@ -227,9 +227,9 @@ export const Header: React.FC = () => {
         </motion.div>
 
         {/* Unified Controls Container */}
-        <div className="flex items-center ios-glass-accent p-1 rounded-2xl border border-white/15 shadow-2xl mr-2 md:mr-0 gap-1">
+        <div className="flex items-center ios-glass-accent p-0.5 sm:p-1 rounded-xl md:rounded-2xl border border-white/15 shadow-2xl mr-1 md:mr-0 gap-0.5 sm:gap-1 max-w-full overflow-x-auto scrollbar-hide">
           
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 sm:gap-1">
              <button 
                onClick={tapTempo}
                className="hidden sm:block text-[9px] font-extrabold uppercase tracking-[0.2em] text-white/60 hover:text-white bg-white/5 hover:bg-white/10 px-2.5 py-2.5 rounded-xl transition-all border border-white/5 h-full"
@@ -238,51 +238,51 @@ export const Header: React.FC = () => {
                TAP
              </button>
              <div className={cn(
-               "flex flex-col items-center justify-center px-2 py-1 rounded-xl transition-all min-w-[70px] relative overflow-hidden",
+               "flex flex-col items-center justify-center px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-lg sm:rounded-xl transition-all min-w-[60px] sm:min-w-[70px] relative overflow-hidden",
                metronomeEnabled 
                  ? "bg-[#00A3FF]/15 border border-[#00A3FF]/30 shadow-[0_0_15px_rgba(0,163,255,0.15)]" 
                  : "hover:bg-white/5 border border-transparent"
              )}>
                 {metronomeEnabled && <div className="absolute inset-0 bg-[#00A3FF]/10 animate-pulse" />}
                 <button onClick={toggleMetronome} className={cn("flex items-center justify-center mb-0.5", metronomeEnabled ? "text-[#00A3FF] scale-110" : "text-white/40 hover:text-white transition-all")}>
-                  <Clock size={12} />
+                  <Clock size={11} className="sm:w-3 sm:h-3" />
                 </button>
-                <div className="flex items-center justify-between w-full h-[18px] gap-1 z-10">
-                   <button onClick={() => updateBpm(-1)} className="text-white/40 hover:text-white font-black text-xs px-1 leading-none">-</button>
-                   <span className={cn("font-black text-xs md:text-sm tabular-nums tracking-tighter w-8 text-center", metronomeEnabled ? "text-[#00A3FF]" : "text-white")}>{currentSong?.bpm || globalBpm}</span>
-                   <button onClick={() => updateBpm(1)} className="text-white/40 hover:text-white font-black text-xs px-1 leading-none">+</button>
+                <div className="flex items-center justify-between w-full h-[18px] gap-0.5 sm:gap-1 z-10">
+                   <button onClick={() => updateBpm(-1)} className="text-white/40 hover:text-white font-black text-[10px] sm:text-xs px-1 leading-none">-</button>
+                   <span className={cn("font-black text-[10px] sm:text-xs md:text-sm tabular-nums tracking-tighter w-7 sm:w-8 text-center", metronomeEnabled ? "text-[#00A3FF]" : "text-white")}>{currentSong?.bpm || globalBpm}</span>
+                   <button onClick={() => updateBpm(1)} className="text-white/40 hover:text-white font-black text-[10px] sm:text-xs px-1 leading-none">+</button>
                 </div>
              </div>
           </div>
           
-          <div className="w-[1px] h-6 bg-white/10 mx-1" />
+          <div className="w-[1px] h-6 bg-white/10 mx-0.5 sm:mx-1" />
 
           <button 
             onClick={toggleLRSplit}
             className={cn(
-              "flex flex-col items-center justify-center px-3 py-1.5 rounded-xl transition-all min-w-[50px]",
+              "flex flex-col items-center justify-center px-1.5 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl transition-all min-w-[38px] sm:min-w-[50px]",
               isLRSplit 
                 ? "bg-[#2ECC71]/10 text-[#2ECC71]" 
                 : "text-white/40 hover:bg-white/5 hover:text-white"
             )}
           >
-            <Headphones size={12} className={cn("mb-0.5", isLRSplit ? "text-[#2ECC71]" : "")} />
-            <span className="font-black text-xs md:text-sm">L/R</span>
+            <Headphones size={11} className={cn("mb-0.5 sm:w-3 sm:h-3", isLRSplit ? "text-[#2ECC71]" : "")} />
+            <span className="font-black text-[9px] sm:text-xs md:text-sm">L/R</span>
           </button>
 
-          <div className="hidden sm:block w-[1px] h-6 bg-white/10 mx-1" />
+          <div className="hidden sm:block w-[1px] h-6 bg-white/10 mx-0.5 sm:mx-1" />
 
           <button 
             onClick={cycleTimeSignature}
             disabled={!currentSong}
-            className="hidden sm:flex flex-col items-center justify-center px-3 py-1.5 rounded-xl transition-colors text-white/40 hover:bg-white/5 hover:text-white disabled:opacity-50 min-w-[50px]"
+            className="hidden sm:flex flex-col items-center justify-center px-1.5 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl transition-colors text-white/40 hover:bg-white/5 hover:text-white disabled:opacity-50 min-w-[38px] sm:min-w-[50px]"
             title="Change Time Signature"
           >
-            <Hash size={12} className="mb-0.5" />
-            <span className="font-black text-xs md:text-sm">{currentSong?.timeSignature || "4/4"}</span>
+            <Hash size={11} className="mb-0.5 sm:w-3 sm:h-3" />
+            <span className="font-black text-[9px] sm:text-xs md:text-sm">{currentSong?.timeSignature || "4/4"}</span>
           </button>
 
-          <div className="w-[1px] h-6 bg-white/10 mx-1" />
+          <div className="w-[1px] h-6 bg-white/10 mx-0.5 sm:mx-1" />
 
           {/* Advanced Pitch Transposer Button */}
           <div className="relative" ref={keyRef}>
@@ -290,14 +290,14 @@ export const Header: React.FC = () => {
               onClick={() => setShowKeySelector(!showKeySelector)}
               title="Transposição de Tom"
               className={cn(
-                "flex flex-col items-center justify-center px-3 py-1.5 rounded-xl transition-all min-w-[50px]",
+                "flex flex-col items-center justify-center px-1.5 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl transition-all min-w-[38px] sm:min-w-[50px]",
                 showKeySelector || pitchShift !== 0
                   ? "bg-[#F1C40F]/10 text-[#F1C40F]" 
                   : "text-white/40 hover:bg-white/5 hover:text-white"
               )}
             >
-              <Key size={12} className={cn("mb-0.5", pitchShift !== 0 ? "text-[#F1C40F]" : "text-white/40")} />
-              <span className={cn("font-black text-xs md:text-sm", pitchShift !== 0 ? "text-[#F1C40F]" : "text-white")}>
+              <Key size={11} className={cn("mb-0.5 sm:w-3 sm:h-3", pitchShift !== 0 ? "text-[#F1C40F]" : "text-white/40")} />
+              <span className={cn("font-black text-[9px] sm:text-xs md:text-sm", pitchShift !== 0 ? "text-[#F1C40F]" : "text-white")}>
                 {currentKeyName}
               </span>
             </button>
@@ -504,40 +504,61 @@ export const Header: React.FC = () => {
               onClick={toggleStageMode}
               title={isStageMode ? "Exit Stage Mode" : "Enter Stage Mode"}
               className={cn(
-                "p-2 md:p-2.5 rounded-xl transition-all",
+                "p-1.5 sm:p-2 md:p-2.5 rounded-xl transition-all shrink-0",
                 isStageMode ? "bg-[#00A3FF]/20 text-[#00A3FF]" : "text-white/40 hover:text-white hover:bg-white/5"
               )}
             >
-              <MonitorPlay size={18} className="md:w-5 md:h-5" />
+              <MonitorPlay size={16} className="sm:w-[18px] sm:h-[18px] md:w-5 md:h-5" />
             </button>
             <button 
               onClick={() => setShowMidiMap(true)}
               title="MIDI Mapeamento"
-              className="p-2 md:p-2.5 rounded-xl transition-all text-white/40 hover:text-[#00A3FF] hover:bg-[#00A3FF]/10"
+              className="p-1.5 sm:p-2 md:p-2.5 rounded-xl transition-all text-white/40 hover:text-[#00A3FF] hover:bg-[#00A3FF]/10 hidden sm:flex shrink-0"
             >
-              <Settings size={18} className="md:w-5 md:h-5" />
+              <Settings size={16} className="sm:w-[18px] sm:h-[18px] md:w-5 md:h-5" />
             </button>
             {isAdmin && (
               <button 
                 onClick={() => setShowAdmin(true)}
                 title="Admin Panel"
-                className="p-2 md:p-2.5 rounded-xl transition-all text-white/40 hover:text-[#2ECC71] hover:bg-[#2ECC71]/10"
+                className="p-1.5 sm:p-2 md:p-2.5 rounded-xl transition-all text-white/40 hover:text-[#2ECC71] hover:bg-[#2ECC71]/10 shrink-0"
               >
-                <Users size={18} className="md:w-5 md:h-5" />
+                <Users size={16} className="sm:w-[18px] sm:h-[18px] md:w-5 md:h-5" />
               </button>
             )}
+            
+            {user && (
+              <div className="flex items-center gap-1.5 sm:gap-2 bg-white/5 border border-white/10 rounded-xl px-1.5 py-1 sm:px-2.5 sm:py-1.5 hover:bg-white/10 transition-all duration-200 shrink-0" title={user.email || 'Usuário conectado'}>
+                {user.photoURL ? (
+                  <img src={user.photoURL} alt={user.displayName || user.email} className="w-5 h-5 sm:w-6 sm:h-6 rounded-full object-cover border border-white/20" referrerPolicy="no-referrer" />
+                ) : (
+                  <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-[#00A3FF]/20 border border-[#00A3FF]/40 flex items-center justify-center text-[#00A3FF] text-[10px] font-extrabold uppercase">
+                    {(user.displayName || user.email || 'U').substring(0, 1)}
+                  </div>
+                )}
+                <div className="flex flex-col text-left hidden lg:flex max-w-[100px]">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-white/95 truncate leading-tight">
+                    {user.displayName || user.email?.split('@')[0] || 'Usuário'}
+                  </span>
+                  <span className="text-[8px] text-[#00A3FF] font-extrabold tracking-wider leading-none uppercase">
+                    {isAdmin ? 'ADMINISTRADOR' : 'GIGGER'}
+                  </span>
+                </div>
+              </div>
+            )}
+
             <button 
               onClick={logout}
               title="Log out"
-              className="p-2 md:p-2.5 rounded-xl transition-all text-white/40 hover:text-[#E74C3C] hover:bg-[#E74C3C]/10"
+              className="p-1.5 sm:p-2 md:p-2.5 rounded-xl transition-all text-white/40 hover:text-[#E74C3C] hover:bg-[#E74C3C]/10 shrink-0"
             >
-              <LogOut size={18} className="md:w-5 md:h-5" />
+              <LogOut size={16} className="sm:w-[18px] sm:h-[18px] md:w-5 md:h-5" />
             </button>
           </div>
         </div>
 
-        <div className="hidden xl:flex items-center gap-4 bg-[#111112] px-5 py-2.5 rounded-2xl border border-white/5 shadow-inner ml-2">
-          <Volume2 size={16} className="text-white/40" />
+        <div className="hidden xl:flex items-center gap-2 bg-[#111112]/95 px-3 py-2 rounded-2xl border border-white/5 shadow-inner ml-1.5 shrink-0">
+          <Volume2 size={15} className="text-white/40" />
           <input
             type="range"
             min="0"
@@ -546,7 +567,7 @@ export const Header: React.FC = () => {
             value={masterVolume}
             onChange={(e) => setMasterVolume(parseFloat(e.target.value))}
             onContextMenu={(e) => handleMidiRightClick(e, 'master_volume', 'Master Volume')}
-            className="w-24 h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer custom-slider accent-[#00A3FF] hover:accent-[#00A3FF]/80 transition-all"
+            className="w-16 lg:w-20 xl:w-24 h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer custom-slider accent-[#00A3FF] hover:accent-[#00A3FF]/80 transition-all"
           />
         </div>
       </div>

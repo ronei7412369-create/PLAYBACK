@@ -3,14 +3,32 @@ import { collection, doc, setDoc, getDocs, deleteDoc } from 'firebase/firestore'
 import { ref, uploadBytes, getBytes, deleteObject } from 'firebase/storage';
 
 export class StorageEngine {
-  private dbName = 'PrimeMultitrackDB';
+  private dbBaseName = 'PrimeMultitrackDB';
   private dbVersion = 2;
   private db: IDBDatabase | null = null;
+  private currentDbName = 'PrimeMultitrackDB';
   private syncing = false;
 
-  async init(): Promise<void> {
+  async init(userId?: string): Promise<void> {
+    const activeUserId = userId || auth.currentUser?.uid;
+    const targetDbName = activeUserId ? `${this.dbBaseName}_${activeUserId}` : this.dbBaseName;
+
+    if (this.db) {
+      if (this.currentDbName === targetDbName) {
+        return;
+      }
+      try {
+        this.db.close();
+      } catch (e) {
+        console.error('Error closing IndexedDB:', e);
+      }
+      this.db = null;
+    }
+
+    this.currentDbName = targetDbName;
+
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(this.dbName, this.dbVersion);
+      const request = indexedDB.open(targetDbName, this.dbVersion);
 
       request.onupgradeneeded = (event: any) => {
         const db = event.target.result;

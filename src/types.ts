@@ -58,6 +58,7 @@ export interface PlayerState {
   user: any | null; // Firebase user
   isStageMode: boolean;
   isLoadingSong: boolean;
+  isSavingSetlist?: boolean;
   isSidebarOpen: boolean;
   preloadingSongId?: string | null;
   preloadedSongIds: string[];
@@ -89,7 +90,7 @@ export interface PlayerState {
   // Actions
   login: () => void;
   loginWithEmail?: (e: string, p: string) => Promise<void>;
-  signUpWithEmail?: (e: string, p: string) => Promise<void>;
+  signUpWithEmail?: (e: string, p: string, displayName?: string) => Promise<void>;
   createInternalUser?: (e: string, p: string, d?: string) => Promise<void>;
   logout: () => void;
   toggleStageMode: () => void;

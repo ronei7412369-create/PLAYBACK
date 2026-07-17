@@ -1,21 +1,31 @@
 import React, { useState, useRef } from 'react';
 import * as ort from 'onnxruntime-web';
 import { DemucsProcessor, CONSTANTS } from 'demucs-web';
-import { Music, Loader, UploadCloud } from 'lucide-react';
+import { Music, Loader, UploadCloud, Youtube, Link, X, Sparkles, CheckCircle, Search, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { getCoverUrl } from '../lib/coverArt';
 
 export const StemSplitter: React.FC = () => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'file' | 'youtube'>('file');
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState('');
   const [downloadProgress, setDownloadProgress] = useState(0);
-  const { addProcessedSong } = usePlayerStore();
 
+  // YouTube Link Specific State
+  const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [isFetchingInfo, setIsFetchingInfo] = useState(false);
+  const [youtubeError, setYoutubeError] = useState('');
+  const [videoInfo, setVideoInfo] = useState<{ title: string; artist: string; coverUrl: string; duration: number } | null>(null);
+
+  const { addProcessedSong } = usePlayerStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -25,16 +35,86 @@ export const StemSplitter: React.FC = () => {
     }
   };
 
-  const processAudio = async (selectedFile: File) => {
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const selectedFile = e.dataTransfer.files?.[0];
+    if (selectedFile && selectedFile.type.startsWith('audio/')) {
+      setFile(selectedFile);
+      processAudio(selectedFile);
+    }
+  };
+
+  const fetchYoutubeInfo = async () => {
+    if (!youtubeUrl.trim()) return;
+    setIsFetchingInfo(true);
+    setYoutubeError('');
+    setVideoInfo(null);
+    try {
+      const res = await fetch(`/api/youtube-info?url=${encodeURIComponent(youtubeUrl)}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Não foi possível buscar as informações do vídeo.');
+      }
+      const data = await res.json();
+      setVideoInfo(data);
+    } catch (err: any) {
+      setYoutubeError(err.message || 'Erro ao buscar vídeo. Verifique se o link está correto.');
+    } finally {
+      setIsFetchingInfo(false);
+    }
+  };
+
+  const handleSplitYoutube = async () => {
+    if (!videoInfo) return;
     setIsProcessing(true);
-    setStatus('Initializing AI...');
+    setStatus('Iniciando download do YouTube...');
+    setProgress(0);
+    setDownloadProgress(0);
+
+    try {
+      const response = await fetch(`/api/youtube-download?url=${encodeURIComponent(youtubeUrl)}`);
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Erro ao baixar áudio do YouTube');
+      }
+
+      setStatus('Carregando áudio...');
+      const blob = await response.blob();
+      const fileObj = new File([blob], `${videoInfo.title}.mp3`, { type: 'audio/mpeg' });
+
+      await processAudio(fileObj, videoInfo.title, videoInfo.artist, videoInfo.coverUrl);
+    } catch (err: any) {
+      console.error(err);
+      setStatus(`Erro: ${err.message || String(err)}`);
+      setTimeout(() => setIsProcessing(false), 4000);
+    }
+  };
+
+  const processAudio = async (
+    selectedFile: File, 
+    customTitle?: string, 
+    customArtist?: string, 
+    customCoverUrl?: string
+  ) => {
+    setIsProcessing(true);
+    setStatus('Inicializando IA...');
     setProgress(0);
     setDownloadProgress(0);
 
     try {
       const audioContext = new AudioContext({ sampleRate: CONSTANTS.SAMPLE_RATE });
       
-      setStatus('Decoding audio...');
+      setStatus('Decodificando áudio...');
       const arrayBuffer = await selectedFile.arrayBuffer();
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
       
@@ -52,7 +132,7 @@ export const StemSplitter: React.FC = () => {
             ort.env.webgpu = { powerPreference: 'high-performance' };
           }
         } catch (e) {
-          console.log('WebGPU not available');
+          console.log('WebGPU não disponível');
         }
       }
 
@@ -60,11 +140,11 @@ export const StemSplitter: React.FC = () => {
         ort,
         onProgress: (p) => {
           setProgress(p.progress * 100);
-          setStatus(`Processing: ${Math.round(p.progress * 100)}%`);
+          setStatus(`Separando tracks: ${Math.round(p.progress * 100)}%`);
         },
         onLog: (phase, msg) => {
           if(phase === 'Download') {
-            setStatus('Downloading model...');
+            setStatus('Baixando modelo de IA...');
           }
         },
         onDownloadProgress: (loaded, total) => {
@@ -72,13 +152,13 @@ export const StemSplitter: React.FC = () => {
         }
       });
 
-      setStatus('Loading model...');
+      setStatus('Carregando modelo de IA...');
       await processor.loadModel(CONSTANTS.DEFAULT_MODEL_URL);
 
-      setStatus('Splitting stems...');
+      setStatus('Executando separação (Split)...');
       const result = await processor.separate(leftChannel, rightChannel);
 
-      setStatus('Saving tracks...');
+      setStatus('Renderizando stems...');
       
       const createWavData = (left: Float32Array, right: Float32Array, filename: string) => {
         const numChannels = 2;
@@ -131,14 +211,15 @@ export const StemSplitter: React.FC = () => {
       const otherData = createWavData(result.other.left, result.other.right, 'other.wav');
       const vocalsData = createWavData(result.vocals.left, result.vocals.right, 'vocals.wav');
 
-      
-      const songTitle = selectedFile.name.replace(/\.[^/.]+$/, "");
-      const songArtist = 'AI Processed';
+      const songTitle = customTitle || selectedFile.name.replace(/\.[^/.]+$/, "");
+      const songArtist = customArtist || 'AI Processed';
+      const coverUrl = customCoverUrl || getCoverUrl(songTitle, songArtist);
+
       addProcessedSong({
         id: songId,
         title: songTitle,
         artist: songArtist,
-        coverUrl: getCoverUrl(songTitle, songArtist),
+        coverUrl: coverUrl,
         stems: [
           { id: `${songId}-vocals`, name: 'Vocals', file: vocalsData.url, originalFile: vocalsData.file, output: 3, pan: 0, volume: 0.5, isMuted: false, isSoloed: false },
           { id: `${songId}-drums`, name: 'Drums', file: drumsData.url, originalFile: drumsData.file, output: 3, pan: 0, volume: 0.5, isMuted: false, isSoloed: false },
@@ -147,69 +228,227 @@ export const StemSplitter: React.FC = () => {
         ]
       });
 
-      setStatus('Finished!');
+      setStatus('Concluído com Sucesso!');
       setTimeout(() => {
         setIsProcessing(false);
         setFile(null);
+        setVideoInfo(null);
+        setYoutubeUrl('');
+        setIsOpen(false);
       }, 2000);
     } catch (e: any) {
       console.error(e);
-      setStatus(`Error: ${e.message || String(e)}`);
-      setTimeout(() => setIsProcessing(false), 3000);
+      setStatus(`Erro: ${e.message || String(e)}`);
+      setTimeout(() => setIsProcessing(false), 4000);
     }
+  };
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
     <div className="flex items-center">
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        className="hidden" 
-        accept="audio/*" 
-        onChange={handleFileChange}
-      />
-      
-      <AnimatePresence mode="wait">
-        {!isProcessing ? (
-          <motion.button
-            key="button"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 bg-[#00A3FF]/10 hover:bg-[#00A3FF]/20 text-[#00A3FF] border border-[#00A3FF]/20 px-4 py-2 rounded-xl transition-all font-bold text-sm h-10 w-[240px] justify-center"
-          >
-            <UploadCloud size={16} />
-            <span>AI Stem Splitter</span>
-          </motion.button>
-        ) : (
-          <motion.div
-            key="progress"
-            initial={{ opacity: 0, width: 0 }}
-            animate={{ opacity: 1, width: '240px' }}
-            exit={{ opacity: 0 }}
-            className="flex flex-col justify-center bg-[#050505] border border-[#00A3FF]/30 px-3 py-1.5 rounded-xl h-10 overflow-hidden relative shadow-[0_0_15px_rgba(0,163,255,0.1)]"
-          >
-             <div className="flex items-center justify-between gap-2 z-10 relative mb-1">
-               <div className="flex items-center gap-1.5 text-xs font-bold text-[#00A3FF] truncate">
-                 <Loader size={12} className="animate-spin shrink-0" />
-                 <span className="truncate">{status}</span>
-               </div>
-               <span className="text-[10px] font-mono font-black text-white/70 tabular-nums">
-                 {Math.round(progress > 0 ? progress : downloadProgress)}%
-               </span>
-             </div>
-             <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden shrink-0">
-               <motion.div 
-                 className="h-full bg-gradient-to-r from-[#00A3FF] to-[#0066FF]"
-                 style={{ width: `${progress > 0 ? progress : downloadProgress}%` }}
-                 transition={{ duration: 0.2 }}
-               />
-             </div>
-          </motion.div>
+      <button
+        onClick={() => setIsOpen(true)}
+        className="flex items-center gap-2 bg-[#00A3FF]/10 hover:bg-[#00A3FF]/20 text-[#00A3FF] border border-[#00A3FF]/20 px-4 py-2 rounded-xl transition-all font-bold text-sm h-10 w-[240px] justify-center shadow-lg shadow-[#00A3FF]/5 hover:scale-[1.02]"
+      >
+        <UploadCloud size={16} />
+        <span>AI Stem Splitter</span>
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              onClick={() => !isProcessing && setIsOpen(false)}
+            />
+
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-[#0a0a0a] border border-white/10 rounded-3xl w-full max-w-lg overflow-hidden relative shadow-2xl flex flex-col z-10"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-white/5">
+                <h2 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
+                  <Sparkles className="text-[#00A3FF] animate-pulse" size={20} />
+                  AI Stem Splitter
+                </h2>
+                {!isProcessing && (
+                  <button 
+                    onClick={() => setIsOpen(false)} 
+                    className="p-2 text-white/50 hover:text-white bg-black/50 hover:bg-white/10 rounded-full transition-all"
+                  >
+                    <X size={20} />
+                  </button>
+                )}
+              </div>
+
+              {/* Progress Panel */}
+              {isProcessing ? (
+                <div className="p-8 flex flex-col items-center justify-center h-[320px] text-center">
+                  <div className="relative mb-6">
+                    <Loader size={48} className="animate-spin text-[#00A3FF]" />
+                    <div className="absolute inset-0 flex items-center justify-center text-[10px] font-mono font-black text-white/70">
+                      {Math.round(progress > 0 ? progress : downloadProgress)}%
+                    </div>
+                  </div>
+                  
+                  <h3 className="text-white font-bold text-lg mb-2">Processando Faixa</h3>
+                  <p className="text-sm text-[#00A3FF] font-medium animate-pulse mb-6">{status}</p>
+
+                  <div className="w-full max-w-xs h-1.5 bg-white/10 rounded-full overflow-hidden">
+                    <motion.div 
+                      className="h-full bg-gradient-to-r from-[#00A3FF] to-[#0066FF]"
+                      style={{ width: `${progress > 0 ? progress : downloadProgress}%` }}
+                      transition={{ duration: 0.2 }}
+                    />
+                  </div>
+                  <span className="text-[10px] text-white/30 uppercase tracking-widest font-black mt-3">
+                    Isso pode levar alguns minutos
+                  </span>
+                </div>
+              ) : (
+                <>
+                  {/* Tabs */}
+                  <div className="flex border-b border-white/5">
+                    <button 
+                      onClick={() => setActiveTab('file')}
+                      className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${activeTab === 'file' ? 'text-[#00A3FF] border-b-2 border-[#00A3FF]' : 'text-white/50 hover:bg-white/5 hover:text-white'}`}
+                    >
+                      <UploadCloud size={18} />
+                      Arquivo Local
+                    </button>
+                    <button 
+                      onClick={() => setActiveTab('youtube')}
+                      className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${activeTab === 'youtube' ? 'text-[#00A3FF] border-b-2 border-[#00A3FF]' : 'text-white/50 hover:bg-white/5 hover:text-white'}`}
+                    >
+                      <Youtube size={18} />
+                      Link do YouTube
+                    </button>
+                  </div>
+
+                  {/* Body Content */}
+                  <div className="p-6 min-h-[260px] flex flex-col justify-center">
+                    {activeTab === 'file' ? (
+                      <div 
+                        ref={dragRef}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                        onClick={() => fileInputRef.current?.click()}
+                        className={cn(
+                          "border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center gap-4 cursor-pointer transition-all h-[200px] text-center",
+                          isDragging 
+                            ? "border-[#00A3FF] bg-[#00A3FF]/5 text-white" 
+                            : "border-white/10 hover:border-[#00A3FF]/50 bg-white/5 text-white/50 hover:text-white"
+                        )}
+                      >
+                        <input 
+                          type="file" 
+                          ref={fileInputRef} 
+                          className="hidden" 
+                          accept="audio/*" 
+                          onChange={handleFileChange}
+                        />
+                        <UploadCloud size={40} className="text-[#00A3FF]" />
+                        <div>
+                          <p className="font-bold text-sm">Arraste um áudio aqui ou clique para buscar</p>
+                          <p className="text-xs text-white/30 mt-1">Aceita MP3, WAV, AAC, M4A, etc.</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-4">
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <input 
+                              type="text"
+                              value={youtubeUrl}
+                              onChange={e => setYoutubeUrl(e.target.value)}
+                              placeholder="Cole o link do YouTube aqui..."
+                              className="w-full bg-black/50 border border-white/10 rounded-xl py-3 px-4 text-sm text-white focus:outline-none focus:border-[#00A3FF] transition-colors pr-10"
+                            />
+                            <Youtube size={18} className="absolute right-3 top-3.5 text-white/30" />
+                          </div>
+                          <button
+                            onClick={fetchYoutubeInfo}
+                            disabled={isFetchingInfo || !youtubeUrl.trim()}
+                            className="bg-white/10 hover:bg-white/20 text-white font-bold text-sm px-5 py-3 rounded-xl transition-all flex items-center gap-1.5 disabled:opacity-40 shrink-0"
+                          >
+                            {isFetchingInfo ? (
+                              <Loader size={16} className="animate-spin" />
+                            ) : (
+                              <Search size={16} />
+                            )}
+                            Buscar
+                          </button>
+                        </div>
+
+                        {/* Error state */}
+                        {youtubeError && (
+                          <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-xs">
+                            <AlertCircle size={16} className="shrink-0" />
+                            <span>{youtubeError}</span>
+                          </div>
+                        )}
+
+                        {/* Video Preview */}
+                        {videoInfo && (
+                          <motion.div 
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="p-4 rounded-2xl bg-white/5 border border-white/5 flex gap-4 items-center"
+                          >
+                            <img 
+                              src={videoInfo.coverUrl} 
+                              alt={videoInfo.title}
+                              className="w-20 h-20 rounded-xl object-cover border border-white/10 shrink-0"
+                              referrerPolicy="no-referrer"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <span className="text-white font-bold block truncate text-sm" title={videoInfo.title}>
+                                {videoInfo.title}
+                              </span>
+                              <span className="text-xs text-white/40 block mt-1 truncate">
+                                {videoInfo.artist}
+                              </span>
+                              <span className="text-[10px] font-mono bg-white/10 text-white px-2 py-0.5 rounded-full inline-block mt-2 font-black">
+                                {formatDuration(videoInfo.duration)}
+                              </span>
+                            </div>
+                          </motion.div>
+                        )}
+
+                        {/* Action Split Button */}
+                        {videoInfo && (
+                          <motion.button
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            onClick={handleSplitYoutube}
+                            className="w-full py-4 rounded-xl font-black text-sm transition-all bg-gradient-to-r from-[#00A3FF] to-[#0066FF] text-white hover:opacity-90 shadow-lg shadow-[#00A3FF]/20 flex items-center justify-center gap-2"
+                          >
+                            <Sparkles size={16} />
+                            Dividir Faixas da Música
+                          </motion.button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>
   );
 };
-
