@@ -24,6 +24,17 @@ export const Header: React.FC = () => {
   const [showMidiMap, setShowMidiMap] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showKeySelector, setShowKeySelector] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
+
+  useEffect(() => {
+    const checkStandalone = () => {
+      const isStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+      setIsStandalone(!!isStandaloneMode);
+    };
+    checkStandalone();
+    window.addEventListener('resize', checkStandalone);
+    return () => window.removeEventListener('resize', checkStandalone);
+  }, []);
   const eqRef = useRef<HTMLDivElement>(null);
   const keyRef = useRef<HTMLDivElement>(null);
 
@@ -194,16 +205,7 @@ export const Header: React.FC = () => {
       </div>
 
       <div className="flex items-center gap-1.5 md:gap-4 lg:gap-6 shrink min-w-0 justify-end">
-        {deferredPrompt && (
-          <button
-            onClick={handleInstallClick}
-            className="flex items-center justify-center gap-1 md:gap-2 bg-[#00A3FF]/20 hover:bg-[#00A3FF]/30 text-white p-2 sm:px-3 sm:py-1.5 md:px-4 md:py-2 rounded-xl text-[10px] md:text-xs font-bold transition-all border border-[#00A3FF]/30 shadow-lg shrink-0"
-            title="Instalar App"
-          >
-            <Download size={14} className="text-[#00A3FF]" />
-            <span className="hidden sm:inline">Instalar App</span>
-          </button>
-        )}
+
 
         <motion.div 
           animate={{ scale: isPlaying ? [1, 1.01, 1] : 1 }}
