@@ -49,6 +49,7 @@ export interface Song {
   masterEq?: { low: number; mid: number; high: number };
   playbackRate?: number;
   pitchShift?: number;
+  order?: number;
 }
 
 export interface PlayerState {
@@ -62,6 +63,7 @@ export interface PlayerState {
   isSidebarOpen: boolean;
   preloadingSongId?: string | null;
   preloadedSongIds: string[];
+  downloadedSongIds: string[];
 
   currentSong: Song | null;
   globalBpm: number;
@@ -100,6 +102,7 @@ export interface PlayerState {
   updateSongKey: (id: string, key: string) => void;
   updateSongLyrics: (id: string, lyrics: string) => void;
   removeFromSetlist: (id: string) => void;
+  reorderSetlist: (startIndex: number, endIndex: number) => void;
   clearSetlist: () => void;
   
   // Saved Setlists
@@ -117,6 +120,10 @@ export interface PlayerState {
   addProcessedSong: (song: Omit<Song, 'duration' | 'bpm' | 'key' | 'timeSignature' | 'markers'>) => void;
   setCurrentSong: (song: Song) => Promise<void>;
   preloadSong: (songId: string) => Promise<void>;
+  triggerBackgroundPreload: () => Promise<void>;
+  downloadSongForOffline: (songId: string) => Promise<void>;
+  downloadSetlistForOffline: () => Promise<void>;
+  refreshDownloadedSongs: () => Promise<void>;
   updatePeaks?: (peaks: number[]) => void;
   togglePlay: () => void;
   stop: () => void;

@@ -2,6 +2,26 @@ import { db, storage, auth } from './firebase';
 import { collection, doc, setDoc, getDocs, deleteDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getBytes, deleteObject } from 'firebase/storage';
 
+function removeUndefinedFields(obj: any): any {
+  if (obj === null || obj === undefined) return null;
+  if (Array.isArray(obj)) {
+    return obj.map(item => removeUndefinedFields(item));
+  }
+  if (typeof obj === 'object') {
+    if (Object.prototype.toString.call(obj) === '[object Object]') {
+      const res: any = {};
+      for (const key of Object.keys(obj)) {
+        const val = obj[key];
+        if (val !== undefined) {
+          res[key] = removeUndefinedFields(val);
+        }
+      }
+      return res;
+    }
+  }
+  return obj;
+}
+
 export class StorageEngine {
   private dbBaseName = 'PrimeMultitrackDB';
   private dbVersion = 2;
@@ -89,8 +109,25 @@ export class StorageEngine {
     }
   }
 
+  sanitizeSong(song: any): any {
+    if (!song) return song;
+    const sanitized = { ...song };
+    if (Array.isArray(sanitized.stems)) {
+      sanitized.stems = sanitized.stems.map((stem: any) => {
+        const { buffer, originalFile, ...rest } = stem;
+        return rest;
+      });
+    }
+    if (sanitized.waveformPeaks && !Array.isArray(sanitized.waveformPeaks)) {
+      sanitized.waveformPeaks = Array.from(sanitized.waveformPeaks);
+    }
+    return removeUndefinedFields(sanitized);
+  }
+
   async saveSong(song: any, stemsData: { id: string, buffer: ArrayBuffer }[]): Promise<void> {
     if (!this.db) await this.init();
+    
+    const sanitizedSong = this.sanitizeSong(song);
     
     await new Promise<void>((resolve, reject) => {
       const transaction = this.db!.transaction(['songs', 'stems'], 'readwrite');
@@ -99,7 +136,7 @@ export class StorageEngine {
       transaction.onerror = (err) => reject(err);
 
       const songStore = transaction.objectStore('songs');
-      songStore.put(song);
+      songStore.put(sanitizedSong);
 
       const stemStore = transaction.objectStore('stems');
       stemsData.forEach(stem => {
@@ -110,7 +147,7 @@ export class StorageEngine {
     if (auth.currentUser) {
       const userId = auth.currentUser.uid;
       // Save metadata
-      setDoc(doc(db, 'users', userId, 'songs', song.id), song).catch(console.error);
+      setDoc(doc(db, 'users', userId, 'songs', sanitizedSong.id), sanitizedSong).catch(console.error);
       
       // Save stems
       stemsData.forEach(stem => {
@@ -129,6 +166,19 @@ export class StorageEngine {
       const request = store.getAll();
 
       request.onsuccess = () => resolve(request.result || []);
+      request.onerror = (err) => reject(err);
+    });
+  }
+
+  async getAllDownloadedStemIds(): Promise<string[]> {
+    if (!this.db) await this.init();
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['stems'], 'readonly');
+      const store = transaction.objectStore('stems');
+      const request = store.getAllKeys();
+      request.onsuccess = () => {
+        resolve((request.result || []).map(k => k.toString()));
+      };
       request.onerror = (err) => reject(err);
     });
   }
@@ -161,6 +211,69 @@ export class StorageEngine {
     }
     
     return buffer;
+  }
+
+  async loadStemBuffers(ids: string[]): Promise<Map<string, ArrayBuffer>> {
+    if (!this.db) await this.init();
+    
+    const results = new Map<string, ArrayBuffer>();
+    const missingIds: string[] = [];
+    
+    // 1. Try to read all of them from IndexedDB in a single transaction
+    await new Promise<void>((resolve) => {
+      const transaction = this.db!.transaction(['stems'], 'readonly');
+      const store = transaction.objectStore('stems');
+      
+      let completedCount = 0;
+      if (ids.length === 0) {
+        resolve();
+        return;
+      }
+      
+      ids.forEach(id => {
+        const request = store.get(id);
+        request.onsuccess = () => {
+          if (request.result && request.result.buffer) {
+            results.set(id, request.result.buffer);
+          } else {
+            missingIds.push(id);
+          }
+          completedCount++;
+          if (completedCount === ids.length) {
+            resolve();
+          }
+        };
+        request.onerror = () => {
+          missingIds.push(id);
+          completedCount++;
+          if (completedCount === ids.length) {
+            resolve();
+          }
+        };
+      });
+    });
+    
+    // 2. For any missing ones, fetch from cloud in parallel, then save them
+    if (missingIds.length > 0 && auth.currentUser) {
+      const userId = auth.currentUser.uid;
+      const fetchPromises = missingIds.map(async (id) => {
+        try {
+          const fileRef = ref(storage, `users/${userId}/stems/${id}`);
+          const buffer = await getBytes(fileRef);
+          if (buffer) {
+            results.set(id, buffer);
+            // Save back to IndexedDB
+            const transaction = this.db!.transaction(['stems'], 'readwrite');
+            transaction.objectStore('stems').put({ id, buffer });
+          }
+        } catch (err) {
+          console.warn("Stem not found in cloud either:", id, err);
+        }
+      });
+      await Promise.all(fetchPromises);
+    }
+    
+    return results;
   }
 
   async savePadBuffer(note: string, buffer: ArrayBuffer): Promise<void> {
@@ -212,15 +325,20 @@ export class StorageEngine {
   async saveSetlist(setlist: { id: string, name: string, songIds: string[], songs?: any[] }): Promise<void> {
     if (!this.db) await this.init();
     
+    const sanitizedSetlist = removeUndefinedFields({
+      ...setlist,
+      songs: setlist.songs ? setlist.songs.map(song => this.sanitizeSong(song)) : undefined
+    });
+    
     await new Promise<void>((resolve, reject) => {
       const transaction = this.db!.transaction(['setlists'], 'readwrite');
       transaction.oncomplete = () => resolve();
       transaction.onerror = (err) => reject(err);
-      transaction.objectStore('setlists').put(setlist);
+      transaction.objectStore('setlists').put(sanitizedSetlist);
     });
 
     if (auth.currentUser) {
-      setDoc(doc(db, 'users', auth.currentUser.uid, 'setlists', setlist.id), setlist).catch(console.error);
+      setDoc(doc(db, 'users', auth.currentUser.uid, 'setlists', setlist.id), sanitizedSetlist).catch(console.error);
     }
   }
 

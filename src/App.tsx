@@ -118,25 +118,6 @@ export default function App() {
           // We bypass Zustand store to avoid massive re-renders of the WHOLE app
           // But since other components rely on currentTime from store, we'll update it.
           usePlayerStore.setState({ currentTime: engTime });
-          
-          if (currentSong) {
-             const { setlist, preloadingSongId, preloadedSongIds } = usePlayerStore.getState();
-             const currentIndex = setlist.findIndex(s => s.id === currentSong.id);
-             if (currentIndex !== -1 && currentIndex < setlist.length - 1) {
-                // Preload all remaining songs sequentially, but let's just trigger the next one for now.
-                // Since `preloadSong` will only work if not already `preloadedSongIds`, once it's done,
-                // the next tick won't trigger it again. We could even look ahead to all un-preloaded songs.
-                for (let i = currentIndex + 1; i < setlist.length; i++) {
-                   const nextSongId = setlist[i].id;
-                   if (!preloadedSongIds.includes(nextSongId)) {
-                      if (!preloadingSongId) {
-                         usePlayerStore.getState().preloadSong(nextSongId);
-                      }
-                      break; // Only preload one at a time, wait for it to finish
-                   }
-                }
-             }
-          }
         }
         lastTime = timestamp;
       }

@@ -253,10 +253,11 @@ export const StemSplitter: React.FC = () => {
     <div className="flex items-center">
       <button
         onClick={() => setIsOpen(true)}
-        className="flex items-center gap-2 bg-[#00A3FF]/10 hover:bg-[#00A3FF]/20 text-[#00A3FF] border border-[#00A3FF]/20 px-4 py-2 rounded-xl transition-all font-bold text-sm h-10 w-[240px] justify-center shadow-lg shadow-[#00A3FF]/5 hover:scale-[1.02]"
+        className="flex items-center gap-0 2xl:gap-2 bg-[#00A3FF]/10 hover:bg-[#00A3FF]/20 text-[#00A3FF] border border-[#00A3FF]/20 px-0 2xl:px-4 rounded-xl transition-all font-bold text-sm h-10 w-10 2xl:w-[240px] justify-center shadow-lg shadow-[#00A3FF]/5 hover:scale-[1.02] shrink-0"
+        title="AI Stem Splitter"
       >
-        <UploadCloud size={16} />
-        <span>AI Stem Splitter</span>
+        <UploadCloud size={16} className="shrink-0" />
+        <span className="hidden 2xl:inline">AI Stem Splitter</span>
       </button>
 
       <AnimatePresence>

@@ -32,6 +32,7 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
         currentTime: 0,
         preloadingSongId: null,
         preloadedSongIds: [],
+        downloadedSongIds: [],
         customPads: {},
         activePadKey: null
       });
@@ -47,9 +48,13 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
           storageEngine.loadSetlists().catch(() => [])
         ]);
         set({
-          setlist: savedSongs || [],
+          setlist: (savedSongs || []).map(song => ({
+            ...song,
+            coverUrl: song.coverUrl || getCoverUrl(song.title, song.artist)
+          })).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
           savedSetlists: savedSetlists || []
         });
+        get().refreshDownloadedSongs().catch(console.error);
         if (get() && typeof get().loadCustomPads === 'function') {
           get().loadCustomPads();
         }
@@ -106,6 +111,7 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
   isSidebarOpen: false,
   preloadingSongId: null,
   preloadedSongIds: [],
+  downloadedSongIds: [],
   activePadKey: null,
   padVolume: 0.5,
   padEq: { low: 0, mid: 0, high: 0 },
@@ -140,7 +146,7 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
         newState.setlist = savedSongs.map(song => ({
           ...song,
           coverUrl: song.coverUrl || getCoverUrl(song.title, song.artist)
-        }));
+        })).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
       }
       if (savedSetlists && savedSetlists.length > 0) {
         newState.savedSetlists = savedSetlists;
@@ -159,24 +165,30 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
   importSong: async (song, buffers) => {
     audioEngine.pause();
     
+    const songWithOrder = {
+      ...song,
+      order: get().setlist.length
+    };
+
     // Save to persistence
     if (buffers) {
       try {
-        await storageEngine.saveSong(song, buffers);
+        await storageEngine.saveSong(songWithOrder, buffers);
       } catch (e) {
         console.error("Failed to save song to DB", e);
       }
     }
 
     set((state) => ({ 
-      setlist: [...state.setlist, song],
-      currentSong: song,
+      setlist: [...state.setlist, songWithOrder],
+      currentSong: songWithOrder,
       currentTime: 0,
       isPlaying: false,
       playbackRate: 1.0
     }));
 
     audioEngine.setPlaybackRate(1.0);
+    get().refreshDownloadedSongs().catch(console.error);
   },
 
   addProcessedSong: async (partialSong) => {
@@ -190,6 +202,7 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
       key: detectedKey,
       timeSignature: '4/4',
       markers: [],
+      order: get().setlist.length
     };
 
     const buffers: { id: string; buffer: ArrayBuffer }[] = [];
@@ -212,6 +225,7 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
       setlist: [...state.setlist, fullSong],
     }));
 
+    get().refreshDownloadedSongs().catch(console.error);
     await get().setCurrentSong(fullSong);
   },
 
@@ -219,7 +233,6 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
     audioEngine.pause();
     const currentSongInState = get().currentSong;
 
-    // Do nothing if we are clicking on already playing song
     if (currentSongInState?.id === song.id) return;
     
     set({ isLoadingSong: true });
@@ -230,31 +243,35 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
        // Let's clear and re-load to be robust. We can optimize later by comparing IDs.
        audioEngine.clearStems();
        
-       const loadPromises = song.stems.map(async (stem) => {
-         // Try cache first
+       const stemsToLoadFromDb: typeof song.stems = [];
+       for (const stem of song.stems) {
          const duration = await audioEngine.loadStemFromCache(stem.id);
          if (duration !== null) {
             audioEngine.setStemVolume(stem.id, stem.volume);
             audioEngine.setStemPan(stem.id, stem.output === 1 ? -1 : stem.output === 2 ? 1 : 0);
-            return;
-         }
-
-         if (stem.originalFile) {
+         } else if (stem.originalFile) {
             await audioEngine.loadStem(stem.id, stem.originalFile);
             audioEngine.setStemVolume(stem.id, stem.volume);
             audioEngine.setStemPan(stem.id, stem.output === 1 ? -1 : stem.output === 2 ? 1 : 0);
          } else {
-            // Re-load from persistence
-            const buffer = await storageEngine.loadStemBuffer(stem.id);
-            if (buffer) {
-               await audioEngine.loadStemFromArrayBuffer(stem.id, buffer);
-               audioEngine.setStemVolume(stem.id, stem.volume);
-               audioEngine.setStemPan(stem.id, stem.output === 1 ? -1 : stem.output === 2 ? 1 : 0);
-            }
+            stemsToLoadFromDb.push(stem);
          }
-       });
+       }
 
-       await Promise.all(loadPromises);
+       if (stemsToLoadFromDb.length > 0) {
+         const stemIds = stemsToLoadFromDb.map(s => s.id);
+         const buffersMap = await storageEngine.loadStemBuffers(stemIds);
+         
+         const decodePromises = stemsToLoadFromDb.map(async (stem) => {
+           const buffer = buffersMap.get(stem.id);
+           if (buffer) {
+             await audioEngine.loadStemFromArrayBuffer(stem.id, buffer);
+             audioEngine.setStemVolume(stem.id, stem.volume);
+             audioEngine.setStemPan(stem.id, stem.output === 1 ? -1 : stem.output === 2 ? 1 : 0);
+           }
+         });
+         await Promise.all(decodePromises);
+       }
        
        const maxDuration = audioEngine.getDuration();
        if (song.duration === 0 && maxDuration > 0) {
@@ -314,13 +331,30 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
        console.error("Failed to load song stems on switch", e);
     }
     
-    // Cleanup cache
-    const { preloadingSongId } = get();
+    // Cleanup cache: keep active song, preloaded/preloading, next 2 songs, and previous 1 song in setlist
+    const { preloadingSongId, preloadedSongIds } = get();
     const keepStemIds = new Set<string>();
+    
     song.stems.forEach(s => keepStemIds.add(s.id));
     if (preloadingSongId) {
        const preloadingSong = get().setlist.find(s => s.id === preloadingSongId);
        if (preloadingSong) preloadingSong.stems.forEach(s => keepStemIds.add(s.id));
+    }
+    preloadedSongIds.forEach(id => {
+       const sSong = get().setlist.find(s => s.id === id);
+       if (sSong) sSong.stems.forEach(s => keepStemIds.add(s.id));
+    });
+
+    const currentIndexInSetlist = get().setlist.findIndex(s => s.id === song.id);
+    if (currentIndexInSetlist !== -1) {
+       if (currentIndexInSetlist > 0) {
+          get().setlist[currentIndexInSetlist - 1].stems.forEach(s => keepStemIds.add(s.id));
+       }
+       for (let i = 1; i <= 2; i++) {
+          if (currentIndexInSetlist + i < get().setlist.length) {
+             get().setlist[currentIndexInSetlist + i].stems.forEach(s => keepStemIds.add(s.id));
+          }
+       }
     }
     audioEngine.clearDecodeCache(Array.from(keepStemIds));
 
@@ -347,6 +381,9 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
       masterVolume: targetMasterVolume,
       masterEq: targetMasterEq
     });
+
+    get().refreshDownloadedSongs().catch(console.error);
+    get().triggerBackgroundPreload();
   },
 
   preloadSong: async (songId) => {
@@ -359,24 +396,130 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
     set({ preloadingSongId: songId });
     
     try {
-       const loadPromises = song.stems.map(async (stem) => {
+       const stemsToLoad: typeof song.stems = [];
+       for (const stem of song.stems) {
          if (stem.originalFile) {
             await audioEngine.preloadStem(stem.id, stem.originalFile);
          } else {
-            const buffer = await storageEngine.loadStemBuffer(stem.id);
+            stemsToLoad.push(stem);
+         }
+       }
+
+       if (stemsToLoad.length > 0) {
+         const stemIds = stemsToLoad.map(s => s.id);
+         const buffersMap = await storageEngine.loadStemBuffers(stemIds);
+         
+         const preloadPromises = stemsToLoad.map(async (stem) => {
+            const buffer = buffersMap.get(stem.id);
             if (buffer) {
                await audioEngine.preloadStemFromArrayBuffer(stem.id, buffer);
             }
-         }
-       });
-       await Promise.all(loadPromises);
+         });
+         await Promise.all(preloadPromises);
+       }
+       
        set(state => ({ preloadedSongIds: [...state.preloadedSongIds, songId] }));
+       get().refreshDownloadedSongs().catch(console.error);
     } catch(e) {
        console.error("Failed to preload", e);
     } finally {
        if (get().preloadingSongId === songId) {
          set({ preloadingSongId: null });
        }
+       setTimeout(() => {
+         get().triggerBackgroundPreload();
+       }, 100);
+    }
+  },
+
+  triggerBackgroundPreload: async () => {
+    const { setlist, currentSong, preloadingSongId, preloadedSongIds } = get();
+    if (!currentSong) return;
+    const currentIndex = setlist.findIndex(s => s.id === currentSong.id);
+    if (currentIndex === -1) return;
+
+    for (let i = currentIndex + 1; i < setlist.length; i++) {
+       const nextSongId = setlist[i].id;
+       if (!preloadedSongIds.includes(nextSongId)) {
+          if (!preloadingSongId) {
+             await get().preloadSong(nextSongId);
+          }
+          break;
+       }
+    }
+  },
+
+  refreshDownloadedSongs: async () => {
+    const { setlist } = get();
+    if (setlist.length === 0) {
+      set({ downloadedSongIds: [] });
+      return;
+    }
+    try {
+      const downloadedStemIds = await storageEngine.getAllDownloadedStemIds();
+      const downloadedStemSet = new Set(downloadedStemIds);
+      
+      const downloadedIds: string[] = [];
+      for (const song of setlist) {
+        if (!song.stems || song.stems.length === 0) {
+          downloadedIds.push(song.id);
+          continue;
+        }
+        const allStemsExist = song.stems.every(stem => downloadedStemSet.has(stem.id) || stem.originalFile);
+        if (allStemsExist) {
+          downloadedIds.push(song.id);
+        }
+      }
+      set({ downloadedSongIds: downloadedIds });
+    } catch (e) {
+      console.error("Failed to refresh downloaded songs:", e);
+    }
+  },
+
+  downloadSongForOffline: async (songId: string) => {
+    const { setlist } = get();
+    const song = setlist.find(s => s.id === songId);
+    if (!song) return;
+    
+    try {
+      const stemIdsToLoad = song.stems
+        .filter(stem => !stem.originalFile)
+        .map(stem => stem.id);
+        
+      if (stemIdsToLoad.length > 0) {
+        await storageEngine.loadStemBuffers(stemIdsToLoad);
+      }
+      await get().refreshDownloadedSongs();
+    } catch (e) {
+      console.error("Failed to download song for offline use:", e);
+    }
+  },
+
+  downloadSetlistForOffline: async () => {
+    const { setlist } = get();
+    if (setlist.length === 0) return;
+    
+    const allStemIds: string[] = [];
+    for (const song of setlist) {
+      if (song.stems) {
+        for (const stem of song.stems) {
+          if (!stem.originalFile) {
+            allStemIds.push(stem.id);
+          }
+        }
+      }
+    }
+    
+    if (allStemIds.length === 0) {
+      await get().refreshDownloadedSongs();
+      return;
+    }
+    
+    try {
+      await storageEngine.loadStemBuffers(allStemIds);
+      await get().refreshDownloadedSongs();
+    } catch (e) {
+      console.error("Failed to download setlist for offline use:", e);
     }
   },
 
@@ -870,10 +1013,32 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
        setlist: state.setlist.filter(s => s.id !== id),
        currentSong: state.currentSong?.id === id ? null : state.currentSong
     }));
+    get().refreshDownloadedSongs().catch(console.error);
+  },
+
+  reorderSetlist: (startIndex, endIndex) => {
+    set((state) => {
+      const newSetlist = Array.from(state.setlist);
+      const [removed] = newSetlist.splice(startIndex, 1);
+      newSetlist.splice(endIndex, 0, removed);
+      
+      const updatedSetlist = newSetlist.map((song, idx) => {
+        const updatedSong = { ...song, order: idx };
+        storageEngine.saveSong(updatedSong, []).catch(console.error);
+        return updatedSong;
+      });
+
+      return {
+        setlist: updatedSetlist
+      };
+    });
+    
+    get().refreshDownloadedSongs().catch(console.error);
+    get().triggerBackgroundPreload();
   },
   
   clearSetlist: () => {
-    set({ setlist: [], currentSong: null });
+    set({ setlist: [], currentSong: null, downloadedSongIds: [] });
     audioEngine.pause();
     audioEngine.clearStems();
   },
@@ -885,21 +1050,13 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
     set({ isSavingSetlist: true });
     
     try {
-      // Explicitly save/update all current songs in the setlist to ensure all EQ, volume settings and STEM BUFFERS are persisted to local DB & cloud!
+      // Explicitly save/update all current songs in the setlist to ensure all EQ, volume and other metadata settings are persisted to local DB & cloud!
+      // We do NOT need to reload or re-upload the heavy stem audio buffers, as they are already saved/uploaded during song import.
       for (const song of setlist) {
         try {
-          const stemsData: { id: string; buffer: ArrayBuffer }[] = [];
-          for (const stem of song.stems) {
-            const buffer = await storageEngine.loadStemBuffer(stem.id);
-            if (buffer) {
-              stemsData.push({ id: stem.id, buffer });
-            }
-          }
-          await storageEngine.saveSong(song, stemsData);
-        } catch (e) {
-          console.error("Failed to persist song/stems on playlist save", e);
-          // Fallback to just saving metadata if buffer load fails
           await storageEngine.saveSong(song, []);
+        } catch (e) {
+          console.error("Failed to persist song metadata on playlist save", e);
         }
       }
 

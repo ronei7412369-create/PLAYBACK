@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
-import { FileMusic, Search, Edit3, Save, X, Trash2, Image, Upload } from 'lucide-react';
+import { FileMusic, Search, Edit3, Save, X, Trash2, Image, Upload, HardDrive, Cloud } from 'lucide-react';
 import { getCoverUrl } from '../lib/coverArt';
 
 const AVAILABLE_KEYS = [
@@ -12,13 +12,29 @@ const AVAILABLE_KEYS = [
 ];
 
 export const PlayList: React.FC = () => {
-  const { setlist, currentSong, setCurrentSong, removeFromSetlist, updateSongMetadata, isLoadingSong, preloadedSongIds, preloadingSongId } = usePlayerStore();
+  const { 
+    setlist, 
+    currentSong, 
+    setCurrentSong, 
+    removeFromSetlist, 
+    updateSongMetadata, 
+    isLoadingSong, 
+    preloadedSongIds, 
+    preloadingSongId, 
+    reorderSetlist,
+    downloadedSongIds,
+    downloadSongForOffline,
+    downloadSetlistForOffline
+  } = usePlayerStore();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editArtist, setEditArtist] = useState('');
   const [editCoverUrl, setEditCoverUrl] = useState('');
   const [editBpm, setEditBpm] = useState<number>(120);
   const [editKey, setEditKey] = useState<string>('C');
+
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const handleCoverFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -51,13 +67,36 @@ export const PlayList: React.FC = () => {
     }
   };
 
-  const handleDragStart = (e: React.DragEvent, id: string) => {
+  const handleDragStart = (e: React.DragEvent, index: number) => {
      if (isLoadingSong) {
        e.preventDefault();
        return;
      }
-     // For future drag-to-reorder support
-     e.dataTransfer.setData("text/plain", id);
+     setDraggedIndex(index);
+     e.dataTransfer.effectAllowed = 'move';
+     e.dataTransfer.setData("text/plain", index.toString());
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+     e.preventDefault();
+     if (draggedIndex === null) return;
+     if (dragOverIndex !== index) {
+       setDragOverIndex(index);
+     }
+  };
+
+  const handleDrop = (e: React.DragEvent, index: number) => {
+     e.preventDefault();
+     if (draggedIndex !== null && draggedIndex !== index) {
+       reorderSetlist(draggedIndex, index);
+     }
+     setDraggedIndex(null);
+     setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+     setDraggedIndex(null);
+     setDragOverIndex(null);
   };
 
   return (
@@ -72,6 +111,41 @@ export const PlayList: React.FC = () => {
             </div>
          </div>
       )}
+
+      {/* Setlist Header with Offline Download Control */}
+      {setlist.length > 0 && (
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5 bg-black/25 shrink-0">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[9px] font-black text-white/40 uppercase tracking-widest leading-none">Playlist ao Vivo</span>
+            <span className="text-[11px] font-bold text-white/75">{setlist.length} {setlist.length === 1 ? 'música' : 'músicas'}</span>
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              downloadSetlistForOffline();
+            }}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border shrink-0",
+              setlist.every(s => downloadedSongIds.includes(s.id))
+                ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/15"
+                : "bg-[#00A3FF]/10 border-[#00A3FF]/20 text-[#00A3FF] hover:bg-[#00A3FF]/15 active:scale-95"
+            )}
+          >
+            {setlist.every(s => downloadedSongIds.includes(s.id)) ? (
+              <>
+                <HardDrive size={11} className="text-emerald-400" />
+                <span>Salvo Offline</span>
+              </>
+            ) : (
+              <>
+                <Cloud size={11} className="animate-pulse" />
+                <span>Salvar Tudo Offline</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
       {/* Setlist List */}
       <div className="flex-1 overflow-y-auto w-full custom-scrollbar py-3 relative">
         {setlist.length === 0 ? (
@@ -85,17 +159,24 @@ export const PlayList: React.FC = () => {
               <motion.div
                 key={song.id}
                 draggable
-                onDragStart={(e: any) => handleDragStart(e, song.id)}
-                whileHover={{ scale: 1.01, translateY: -1 }}
+                onDragStart={(e: any) => handleDragStart(e, idx)}
+                onDragOver={(e) => handleDragOver(e, idx)}
+                onDrop={(e) => handleDrop(e, idx)}
+                onDragEnd={(e: any) => handleDragEnd()}
+                whileHover={draggedIndex === null ? { scale: 1.01, translateY: -1 } : undefined}
                 onClick={(e) => {
                   e.stopPropagation();
                   if (editingId !== song.id && !isLoadingSong) setCurrentSong(song);
                 }}
                 className={cn(
                   "flex flex-col gap-2 p-3.5 rounded-2xl border transition-all cursor-pointer relative group",
-                  currentSong?.id === song.id 
-                    ? "ios-glass-accent border-white/20 shadow-[0_8px_24px_rgba(0,163,255,0.15)] ring-1 ring-white/10" 
-                    : "bg-black/30 border-white/5 hover:bg-white/5 hover:border-white/10"
+                  draggedIndex === idx 
+                    ? "opacity-30 border-dashed border-[#00A3FF]/40 bg-white/5" 
+                    : dragOverIndex === idx 
+                      ? "border-[#00A3FF] bg-[#00A3FF]/10 shadow-[0_0_15px_rgba(0,163,255,0.2)] scale-[1.01]" 
+                      : currentSong?.id === song.id 
+                        ? "ios-glass-accent border-white/20 shadow-[0_8px_24px_rgba(0,163,255,0.15)] ring-1 ring-white/10" 
+                        : "bg-black/30 border-white/5 hover:bg-white/5 hover:border-white/10"
                 )}
               >
                 <div className="flex items-center gap-3 w-full min-w-0">
@@ -209,8 +290,31 @@ export const PlayList: React.FC = () => {
                        <span className={cn("font-extrabold text-xs truncate transition-colors", currentSong?.id === song.id ? "text-white" : "text-white/80 group-hover:text-white")}>
                          {song.title}
                        </span>
-                       <span className={cn("font-medium text-[10px] truncate mt-0.5 transition-colors", currentSong?.id === song.id ? "text-white/60" : "text-white/35 group-hover:text-white/50")}>
-                         {song.artist} • <span className="font-mono">{song.bpm}</span> BPM • Tom: <span className="font-mono font-semibold text-[#F1C40F]">{song.key || "C"}</span>
+                       <span className={cn("font-medium text-[10px] truncate mt-0.5 transition-colors flex items-center gap-1.5 flex-wrap", currentSong?.id === song.id ? "text-white/60" : "text-white/35 group-hover:text-white/50")}>
+                         <span>{song.artist}</span>
+                         <span>•</span>
+                         <span className="font-mono">{song.bpm} BPM</span>
+                         <span>•</span>
+                         <span>Tom: <span className="font-mono font-semibold text-[#F1C40F]">{song.key || "C"}</span></span>
+                         <span>•</span>
+                         {downloadedSongIds.includes(song.id) ? (
+                           <span className="inline-flex items-center gap-0.5 text-emerald-400 font-bold" title="Salvo no dispositivo (Offline OK)">
+                             <HardDrive size={10} />
+                             <span>Offline</span>
+                           </span>
+                         ) : (
+                           <span 
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               downloadSongForOffline(song.id);
+                             }}
+                             className="inline-flex items-center gap-0.5 text-[#00A3FF] hover:text-[#00C2FF] hover:underline cursor-pointer font-bold transition-colors" 
+                             title="Clique para baixar e salvar offline"
+                           >
+                             <Cloud size={10} className="animate-pulse" />
+                             <span>Nuvem</span>
+                           </span>
+                         )}
                        </span>
                     </div>
                   )}
