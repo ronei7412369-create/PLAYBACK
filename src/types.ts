@@ -75,7 +75,7 @@ export interface PlayerState {
   isInfiniteLoop: boolean;
   isFadeOut: boolean;
   setlist: Song[];
-  savedSetlists: { id: string, name: string, songIds: string[], songs?: Song[] }[];
+  savedSetlists: { id: string, name: string, songIds: string[], songs?: Song[], masterEq?: { low: number; mid: number; high: number } }[];
   
   // Real-time parameters
   playbackRate: number; // Tempo

@@ -1044,7 +1044,7 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
   },
 
   saveCurrentSetlist: async (name) => {
-    const { setlist, savedSetlists } = get();
+    const { setlist, savedSetlists, masterEq } = get();
     if (setlist.length === 0) return;
     
     set({ isSavingSetlist: true });
@@ -1079,7 +1079,8 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
         id: Math.random().toString(36).substr(2, 9),
         name,
         songIds: setlist.map(s => s.id),
-        songs: songsSnapshot
+        songs: songsSnapshot,
+        masterEq: { ...masterEq }
       };
       
       await storageEngine.saveSetlist(newSetlist);
@@ -1111,6 +1112,14 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
       
       if (loadedSongs.length > 0) {
         await get().setCurrentSong(loadedSongs[0]);
+      }
+
+      if (targetSetlist.masterEq) {
+        const eq = targetSetlist.masterEq;
+        audioEngine.setMasterEQ('low', eq.low);
+        audioEngine.setMasterEQ('mid', eq.mid);
+        audioEngine.setMasterEQ('high', eq.high);
+        set({ masterEq: { ...eq } });
       }
     } catch (e) {
       console.error("Failed to load setlist songs", e);

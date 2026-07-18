@@ -322,7 +322,7 @@ export class StorageEngine {
     });
   }
 
-  async saveSetlist(setlist: { id: string, name: string, songIds: string[], songs?: any[] }): Promise<void> {
+  async saveSetlist(setlist: { id: string, name: string, songIds: string[], songs?: any[], masterEq?: { low: number, mid: number, high: number } }): Promise<void> {
     if (!this.db) await this.init();
     
     const sanitizedSetlist = removeUndefinedFields({

@@ -6,9 +6,7 @@ import { FileMusic, Search, Edit3, Save, X, Trash2, Image, Upload, HardDrive, Cl
 import { getCoverUrl } from '../lib/coverArt';
 
 const AVAILABLE_KEYS = [
-  'C', 'Cm', 'C#', 'C#m', 'Db', 'Dbm', 'D', 'Dm', 'D#', 'D#m', 'Eb', 'Ebm',
-  'E', 'Em', 'F', 'Fm', 'F#', 'F#m', 'Gb', 'Gbm', 'G', 'Gm', 'G#', 'G#m',
-  'Ab', 'Abm', 'A', 'Am', 'A#', 'A#m', 'Bb', 'Bbm', 'B', 'Bm'
+  'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'
 ];
 
 export const PlayList: React.FC = () => {

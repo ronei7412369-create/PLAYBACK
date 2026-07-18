@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { usePlayerStore } from '../store/usePlayerStore';
-import { Volume2, Settings, Clock, Hash, Key, ShieldCheck, Headphones, MonitorPlay, LogOut, Menu, SlidersHorizontal, X, Users, Download, RotateCcw } from 'lucide-react';
+import { Volume2, Settings, Hash, Key, ShieldCheck, Headphones, MonitorPlay, LogOut, Menu, SlidersHorizontal, X, Users, Download, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { AdminModal } from './AdminModal';
@@ -12,9 +12,7 @@ import { handleMidiRightClick } from '../store/useMidiStore';
 import { getCoverUrl } from '../lib/coverArt';
 
 const AVAILABLE_KEYS = [
-  'C', 'Cm', 'C#', 'C#m', 'Db', 'Dbm', 'D', 'Dm', 'D#', 'D#m', 'Eb', 'Ebm',
-  'E', 'Em', 'F', 'Fm', 'F#', 'F#m', 'Gb', 'Gbm', 'G', 'Gm', 'G#', 'G#m',
-  'Ab', 'Abm', 'A', 'Am', 'A#', 'A#m', 'Bb', 'Bbm', 'B', 'Bm'
+  'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'
 ];
 
 export const Header: React.FC = () => {
@@ -99,11 +97,11 @@ export const Header: React.FC = () => {
   ];
 
   const accidentalKeys = [
-    { index: 1, label: 'C# / Db', pt: 'Dó# / Ré♭' },
-    { index: 3, label: 'D# / Eb', pt: 'Ré# / Mi♭' },
-    { index: 6, label: 'F# / Gb', pt: 'Fá# / Sol♭' },
-    { index: 8, label: 'G# / Ab', pt: 'Sol# / Lá♭' },
-    { index: 10, label: 'A# / Bb', pt: 'Lá# / Si♭' },
+    { index: 1, label: 'C#', pt: 'Dó#' },
+    { index: 3, label: 'D#', pt: 'Ré#' },
+    { index: 6, label: 'F#', pt: 'Fá#' },
+    { index: 8, label: 'G#', pt: 'Sol#' },
+    { index: 10, label: 'A#', pt: 'Lá#' },
   ];
 
   const parseKey = (keyStr: string) => {
@@ -144,11 +142,7 @@ export const Header: React.FC = () => {
     let currentRootIndex = (rootIndex + shift) % 12;
     if (currentRootIndex < 0) currentRootIndex += 12;
     
-    const useFlats = originalKey.includes('b') || originalKey.includes('B') && originalKey.toLowerCase().includes('b');
-    
-    const notes = useFlats 
-      ? ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B']
-      : ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
       
     return `${notes[currentRootIndex]}${isMinor ? 'm' : ''}`;
   };
@@ -172,10 +166,7 @@ export const Header: React.FC = () => {
   };
 
   const getAccidentalLabel = (item: typeof accidentalKeys[0]) => {
-    const useFlats = songKey?.includes('b') || songKey?.includes('B') && songKey?.toLowerCase().includes('b');
-    const label = useFlats ? item.label.split(' / ')[1] : item.label.split(' / ')[0];
-    const pt = useFlats ? item.pt.split(' / ')[1] : item.pt.split(' / ')[0];
-    return { label, pt };
+    return { label: item.label, pt: item.pt };
   };
 
   return (
@@ -237,49 +228,6 @@ export const Header: React.FC = () => {
         {/* Unified Controls Container */}
         <div className="flex items-center ios-glass-accent p-0.5 sm:p-1 rounded-xl md:rounded-2xl border border-white/15 shadow-2xl mr-1 md:mr-0 gap-0.5 sm:gap-1 max-w-full overflow-x-auto scrollbar-hide">
           
-          <div className="flex items-center gap-0.5 sm:gap-1">
-             <button 
-               onClick={tapTempo}
-               className="hidden sm:block text-[9px] font-extrabold uppercase tracking-[0.2em] text-white/60 hover:text-white bg-white/5 hover:bg-white/10 px-2.5 py-2.5 rounded-xl transition-all border border-white/5 h-full"
-               title="Tap Tempo"
-             >
-               TAP
-             </button>
-             <div className={cn(
-               "flex flex-col items-center justify-center px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-lg sm:rounded-xl transition-all min-w-[60px] sm:min-w-[70px] relative overflow-hidden",
-               metronomeEnabled 
-                 ? "bg-[#00A3FF]/15 border border-[#00A3FF]/30 shadow-[0_0_15px_rgba(0,163,255,0.15)]" 
-                 : "hover:bg-white/5 border border-transparent"
-             )}>
-                {metronomeEnabled && <div className="absolute inset-0 bg-[#00A3FF]/10 animate-pulse" />}
-                <button onClick={toggleMetronome} className={cn("flex items-center justify-center mb-0.5", metronomeEnabled ? "text-[#00A3FF] scale-110" : "text-white/40 hover:text-white transition-all")}>
-                  <Clock size={11} className="sm:w-3 sm:h-3" />
-                </button>
-                <div className="flex items-center justify-between w-full h-[18px] gap-0.5 sm:gap-1 z-10">
-                   <button onClick={() => updateBpm(-1)} className="text-white/40 hover:text-white font-black text-[10px] sm:text-xs px-1 leading-none">-</button>
-                   <span className={cn("font-black text-[10px] sm:text-xs md:text-sm tabular-nums tracking-tighter w-7 sm:w-8 text-center", metronomeEnabled ? "text-[#00A3FF]" : "text-white")}>{currentSong?.bpm || globalBpm}</span>
-                   <button onClick={() => updateBpm(1)} className="text-white/40 hover:text-white font-black text-[10px] sm:text-xs px-1 leading-none">+</button>
-                </div>
-             </div>
-          </div>
-          
-          <div className="w-[1px] h-6 bg-white/10 mx-0.5 sm:mx-1" />
-
-          <button 
-            onClick={toggleLRSplit}
-            className={cn(
-              "flex flex-col items-center justify-center px-1.5 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl transition-all min-w-[38px] sm:min-w-[50px]",
-              isLRSplit 
-                ? "bg-[#2ECC71]/10 text-[#2ECC71]" 
-                : "text-white/40 hover:bg-white/5 hover:text-white"
-            )}
-          >
-            <Headphones size={11} className={cn("mb-0.5 sm:w-3 sm:h-3", isLRSplit ? "text-[#2ECC71]" : "")} />
-            <span className="font-black text-[9px] sm:text-xs md:text-sm">L/R</span>
-          </button>
-
-          <div className="hidden sm:block w-[1px] h-6 bg-white/10 mx-0.5 sm:mx-1" />
-
           <button 
             onClick={cycleTimeSignature}
             disabled={!currentSong}
@@ -383,18 +331,34 @@ export const Header: React.FC = () => {
           </div>
         </div>
 
-        <div className="hidden 2xl:flex items-center gap-2 bg-[#111112]/95 px-3 py-2 rounded-2xl border border-white/5 shadow-inner ml-1.5 shrink-0">
-          <Volume2 size={15} className="text-white/40" />
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            value={masterVolume}
-            onChange={(e) => setMasterVolume(parseFloat(e.target.value))}
-            onContextMenu={(e) => handleMidiRightClick(e, 'master_volume', 'Master Volume')}
-            className="w-16 lg:w-20 xl:w-24 h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer custom-slider accent-[#00A3FF] hover:accent-[#00A3FF]/80 transition-all"
-          />
+        <div className="hidden md:flex items-center gap-2 bg-[#111112]/95 px-3 py-1.5 rounded-2xl border border-white/5 shadow-inner ml-1.5 shrink-0">
+          <div className="flex items-center gap-1.5" title="Volume Master">
+            <Volume2 size={14} className="text-white/40" />
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={masterVolume}
+              onChange={(e) => setMasterVolume(parseFloat(e.target.value))}
+              onContextMenu={(e) => handleMidiRightClick(e, 'master_volume', 'Master Volume')}
+              className="w-14 lg:w-16 xl:w-20 h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer custom-slider accent-[#00A3FF] hover:accent-[#00A3FF]/80 transition-all"
+            />
+          </div>
+          <div className="w-[1px] h-4 bg-white/10 mx-1" />
+          <button 
+            onClick={toggleLRSplit}
+            className={cn(
+              "flex items-center gap-1 px-2 py-1 rounded-xl transition-all text-[9px] font-black uppercase tracking-wider",
+              isLRSplit 
+                ? "bg-[#2ECC71]/20 text-[#2ECC71] border border-[#2ECC71]/30" 
+                : "text-white/40 hover:bg-white/5 hover:text-white border border-transparent"
+            )}
+            title="Split L/R (Metrônomo L / Backing Tracks R)"
+          >
+            <Headphones size={11} className={isLRSplit ? "text-[#2ECC71]" : "text-white/40"} />
+            <span>L/R</span>
+          </button>
         </div>
       </div>
       <AdminModal isOpen={showAdmin} onClose={() => setShowAdmin(false)} />
