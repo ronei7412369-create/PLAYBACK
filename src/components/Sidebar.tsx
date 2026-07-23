@@ -62,7 +62,9 @@ export const Sidebar: React.FC = () => {
       
       for (const data of loadedData) {
          stems.push(data.loadedStem);
-         buffersToSave.push({ id: data.id, buffer: data.arrayBuffer });
+         if (data.arrayBuffer && data.arrayBuffer.byteLength > 0) {
+            buffersToSave.push({ id: data.id, buffer: data.arrayBuffer.slice(0) });
+         }
          if (data.duration > totalDuration) {
             totalDuration = data.duration;
          }

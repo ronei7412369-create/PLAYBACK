@@ -2,5 +2,5 @@
   "name": "GIG PLAY",
   "description": "Professional multitrack audio playback application for live performance, featuring stem mixing, waveform visualization, and setlist management.",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -22,6 +22,17 @@ function removeUndefinedFields(obj: any): any {
   return obj;
 }
 
+async function safeStorageOp<T>(op: () => Promise<T>, timeoutMs = 3000): Promise<T | null> {
+  try {
+    const timer = new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs));
+    const result = await Promise.race([op(), timer]);
+    return result;
+  } catch (err) {
+    // Quietly ignore storage errors/timeouts since IndexedDB handles local persistence
+    return null;
+  }
+}
+
 export class StorageEngine {
   private dbBaseName = 'PrimeMultitrackDB';
   private dbVersion = 2;
@@ -129,6 +140,16 @@ export class StorageEngine {
     
     const sanitizedSong = this.sanitizeSong(song);
     
+    const validStemsData: { id: string, buffer: ArrayBuffer }[] = [];
+    stemsData.forEach(stem => {
+      if (stem && stem.buffer && stem.buffer.byteLength > 0) {
+        validStemsData.push({
+          id: stem.id,
+          buffer: stem.buffer.slice(0)
+        });
+      }
+    });
+
     await new Promise<void>((resolve, reject) => {
       const transaction = this.db!.transaction(['songs', 'stems'], 'readwrite');
       
@@ -139,7 +160,7 @@ export class StorageEngine {
       songStore.put(sanitizedSong);
 
       const stemStore = transaction.objectStore('stems');
-      stemsData.forEach(stem => {
+      validStemsData.forEach(stem => {
         stemStore.put(stem);
       });
     });
@@ -147,12 +168,12 @@ export class StorageEngine {
     if (auth.currentUser) {
       const userId = auth.currentUser.uid;
       // Save metadata
-      setDoc(doc(db, 'users', userId, 'songs', sanitizedSong.id), sanitizedSong).catch(console.error);
+      setDoc(doc(db, 'users', userId, 'songs', sanitizedSong.id), sanitizedSong).catch(() => {});
       
       // Save stems
-      stemsData.forEach(stem => {
+      validStemsData.forEach(stem => {
         const fileRef = ref(storage, `users/${userId}/stems/${stem.id}`);
-        uploadBytes(fileRef, stem.buffer).catch(console.error);
+        safeStorageOp(() => uploadBytes(fileRef, stem.buffer.slice(0)));
       });
     }
   }
@@ -198,11 +219,11 @@ export class StorageEngine {
     if (!buffer && auth.currentUser) {
       try {
         const fileRef = ref(storage, `users/${auth.currentUser.uid}/stems/${id}`);
-        buffer = await getBytes(fileRef);
+        buffer = await safeStorageOp(() => getBytes(fileRef));
         
-        if (buffer) {
+        if (buffer && buffer.byteLength > 0) {
           const transaction = this.db!.transaction(['stems'], 'readwrite');
-          transaction.objectStore('stems').put({ id, buffer });
+          transaction.objectStore('stems').put({ id, buffer: buffer.slice(0) });
         }
       } catch (err) {
          // Might not exist or network issue
@@ -259,12 +280,12 @@ export class StorageEngine {
       const fetchPromises = missingIds.map(async (id) => {
         try {
           const fileRef = ref(storage, `users/${userId}/stems/${id}`);
-          const buffer = await getBytes(fileRef);
-          if (buffer) {
+          const buffer = await safeStorageOp(() => getBytes(fileRef));
+          if (buffer && buffer.byteLength > 0) {
             results.set(id, buffer);
             // Save back to IndexedDB
             const transaction = this.db!.transaction(['stems'], 'readwrite');
-            transaction.objectStore('stems').put({ id, buffer });
+            transaction.objectStore('stems').put({ id, buffer: buffer.slice(0) });
           }
         } catch (err) {
           console.warn("Stem not found in cloud either:", id, err);
@@ -278,11 +299,13 @@ export class StorageEngine {
 
   async savePadBuffer(note: string, buffer: ArrayBuffer): Promise<void> {
     if (!this.db) await this.init();
+    if (!buffer || buffer.byteLength === 0) return;
+    const bufCopy = buffer.slice(0);
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['stems'], 'readwrite');
       transaction.oncomplete = () => resolve();
       transaction.onerror = (err) => reject(err);
-      transaction.objectStore('stems').put({ id: `pad-${note}`, buffer });
+      transaction.objectStore('stems').put({ id: `pad-${note}`, buffer: bufCopy });
     });
   }
 
@@ -354,6 +377,22 @@ export class StorageEngine {
 
     if (auth.currentUser) {
       deleteDoc(doc(db, 'users', auth.currentUser.uid, 'setlists', id)).catch(console.error);
+    }
+  }
+
+  async deleteStem(stemId: string): Promise<void> {
+    if (!this.db) await this.init();
+    
+    await new Promise<void>((resolve, reject) => {
+      const transaction = this.db!.transaction(['stems'], 'readwrite');
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = (err) => reject(err);
+      transaction.objectStore('stems').delete(stemId);
+    });
+
+    if (auth.currentUser) {
+      const fileRef = ref(storage, `users/${auth.currentUser.uid}/stems/${stemId}`);
+      safeStorageOp(() => deleteObject(fileRef));
     }
   }
 

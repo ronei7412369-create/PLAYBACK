@@ -4,7 +4,7 @@ import { usePlayerStore } from '../store/usePlayerStore';
 import { Stem } from '../types';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
-import { Settings, X, Volume2, VolumeX, Headphones, SlidersHorizontal, Activity } from 'lucide-react';
+import { Settings, X, Volume2, VolumeX, Headphones, SlidersHorizontal, Activity, Clock, Plus, Upload, Trash2, Check } from 'lucide-react';
 import { audioEngine } from '../services/audioEngine';
 import { handleMidiRightClick } from '../store/useMidiStore';
 
@@ -12,6 +12,7 @@ interface ChannelStripProps {
   stem: Stem;
   index: number;
   onOpenDetails: () => void;
+  onRequestDelete: (stem: Stem) => void;
 }
 
 const TRACK_COLORS = [
@@ -33,12 +34,18 @@ const TRACK_COLORS = [
   '#01A3A4'  // Petrol Teal
 ];
 
-const ChannelStrip: React.FC<ChannelStripProps> = ({ stem, index, onOpenDetails }) => {
-  const { updateStemVolume, isPlaying, toggleStemMute, toggleStemSolo, currentSong } = usePlayerStore();
+const ChannelStrip: React.FC<ChannelStripProps> = ({ stem, index, onOpenDetails, onRequestDelete }) => {
+  const { updateStemVolume, isPlaying, toggleStemMute, toggleStemSolo, currentSong, themeMode } = usePlayerStore();
   const trackColor = TRACK_COLORS[index % TRACK_COLORS.length];
+  const isHighContrast = themeMode === 'high-contrast';
   
   const meterRef = useRef<HTMLDivElement>(null);
   const ledRef = useRef<HTMLDivElement>(null);
+
+  const handleDeleteTrack = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onRequestDelete(stem);
+  };
 
   useEffect(() => {
     let animationFrameId: number;
@@ -85,7 +92,12 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({ stem, index, onOpenDetails 
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex flex-col items-center w-16 sm:w-20 md:w-24 shrink-0 h-full ios-glass border-r border-white/5 py-3 group relative overflow-hidden transition-all hover:bg-white/5"
+      className={cn(
+        "flex flex-col items-center w-16 sm:w-20 md:w-24 shrink-0 h-full py-3 group relative overflow-hidden transition-all",
+        isHighContrast 
+          ? "bg-[#0a0a0e] border-r-2 border-white/20 hover:bg-[#12121a]" 
+          : "ios-glass border-r border-white/5 hover:bg-white/5"
+      )}
     >
       {/* Background Glow */}
       <div 
@@ -97,7 +109,7 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({ stem, index, onOpenDetails 
       />
 
       {/* Dynamic LED Indicator Lamp */}
-      <div className="absolute top-2 right-2 w-2 h-2 flex items-center justify-center pointer-events-none">
+      <div className="absolute top-2 right-2 z-20">
         <div 
           ref={ledRef}
           className="w-1.5 h-1.5 rounded-full transition-all duration-75 border border-white/10"
@@ -114,15 +126,18 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({ stem, index, onOpenDetails 
         <button 
           onClick={onOpenDetails}
           className={cn(
-            "w-full py-2 rounded-xl flex items-center justify-center transition-all duration-300 border overflow-hidden bg-black/40 hover:bg-black/20",
-            stem.isMuted ? "border-white/5 opacity-55" : "shadow-lg"
+            "w-full py-2 rounded-xl flex items-center justify-center transition-all duration-300 border overflow-hidden",
+            isHighContrast 
+              ? "bg-[#000000] border-2 border-white/30 text-white font-black" 
+              : "bg-black/40 hover:bg-black/20",
+            stem.isMuted ? "border-white/10 opacity-55" : "shadow-lg"
           )}
-          style={{ borderColor: stem.isMuted ? undefined : `${trackColor}50`, color: trackColor }}
+          style={{ borderColor: stem.isMuted ? undefined : (isHighContrast ? '#FFFFFF' : `${trackColor}50`), color: isHighContrast ? '#FFFFFF' : trackColor }}
         >
           <span 
             className={cn(
                "text-[8px] md:text-[9.5px] font-extrabold uppercase text-center leading-tight tracking-wider px-1",
-               stem.isMuted ? "text-white/35" : "text-white/90"
+               stem.isMuted ? "text-white/35" : "text-white"
             )}
             style={{ 
               display: '-webkit-box', 
@@ -140,13 +155,18 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({ stem, index, onOpenDetails 
       {/* Fader Area */}
       <div className="flex-1 relative flex flex-col items-center w-full z-10 pb-4 md:pb-6 pt-2">
         {/* VU Meter Container */}
-        <div className="absolute left-1 sm:left-2 md:left-3 top-4 bottom-4 w-1 sm:w-1.5 bg-black/60 rounded-full overflow-hidden border border-white/5 shadow-inner">
+        <div className={cn(
+           "absolute left-1 sm:left-2 md:left-3 top-4 bottom-4 w-1 sm:w-1.5 rounded-full overflow-hidden shadow-inner",
+           isHighContrast ? "bg-[#000000] border-2 border-white/30" : "bg-black/60 border border-white/5"
+        )}>
           <div 
             ref={meterRef}
             className="w-full transition-[height] duration-75 rounded-b-full"
             style={{ 
               position: 'absolute', bottom: 0, left: 0,
-              background: `linear-gradient(to top, ${trackColor}, #FFD60A, #FF453A)`,
+              background: isHighContrast 
+                ? 'linear-gradient(to top, #00FF66, #00FFFF, #FFFF00, #FF0055)' 
+                : `linear-gradient(to top, ${trackColor}, #FFD60A, #FF453A)`,
               height: '0%',
               opacity: stem.isMuted ? 0.15 : 1
             }}
@@ -155,7 +175,10 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({ stem, index, onOpenDetails 
 
         {/* Fader Track */}
         <div className="relative h-full w-full flex justify-center group/fader cursor-pointer" onClick={onOpenDetails}>
-          <div className="absolute top-0 bottom-0 w-1 sm:w-1.5 bg-black/60 rounded-full border border-white/5 shadow-inner" />
+          <div className={cn(
+             "absolute top-0 bottom-0 w-1 sm:w-1.5 rounded-full shadow-inner",
+             isHighContrast ? "bg-[#000000] border-2 border-white/30" : "bg-black/60 border border-white/5"
+          )} />
           
           {/* Fader Tick Marks */}
           <div className="absolute top-0 bottom-0 left-4 sm:left-6 md:left-8 flex flex-col justify-between py-1 pointer-events-none">
@@ -163,7 +186,7 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({ stem, index, onOpenDetails 
               const isZeroDb = i === 2;
               return (
                 <div key={i} className="flex items-center gap-1 relative">
-                  <div className={cn("w-1.5 md:w-2 h-[1px]", isZeroDb ? "bg-[#2ECC71] w-2.5 md:w-3.5 h-[1.5px] shadow-[0_0_8px_#2ECC71]" : "bg-white opacity-20")} />
+                  <div className={cn("w-1.5 md:w-2 h-[1px]", isZeroDb ? "bg-[#2ECC71] w-2.5 md:w-3.5 h-[1.5px] shadow-[0_0_8px_#2ECC71]" : (isHighContrast ? "bg-white opacity-40" : "bg-white opacity-20"))} />
                   {isZeroDb && (
                     <span className="text-[6px] md:text-[7px] font-black text-[#2ECC71] absolute -right-2 md:-right-3 top-[-3.5px] hidden sm:block drop-shadow-[0_0_3px_rgba(46,204,113,0.4)]">
                       0dB
@@ -189,18 +212,22 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({ stem, index, onOpenDetails 
           {/* Custom Fader Thumb */}
           <motion.div 
             className={cn(
-              "absolute w-6 sm:w-8 md:w-9 h-7 sm:h-9 md:h-10 rounded-[10px] md:rounded-xl shadow-xl z-10 pointer-events-none flex flex-col items-center justify-center gap-0.5 border transition-colors duration-300",
-              stem.isMuted ? "bg-white/10 border-white/5" : "bg-gradient-to-br from-[#1E1E20] to-[#0D0D0E]"
+              "absolute w-6 sm:w-8 md:w-9 h-7 sm:h-9 md:h-10 rounded-[10px] md:rounded-xl shadow-xl z-10 pointer-events-none flex flex-col items-center justify-center gap-0.5 border transition-all duration-300",
+              stem.isMuted 
+                ? "bg-white/10 border-white/10" 
+                : (isHighContrast 
+                    ? "bg-[#181822] border-2 border-white shadow-[0_0_15px_rgba(255,255,255,0.35)]" 
+                    : "bg-gradient-to-br from-[#1E1E20] to-[#0D0D0E]")
             )}
             style={{ 
               bottom: `${stem.volume * 100}%`, transform: 'translateY(50%)',
-              borderColor: stem.isMuted ? undefined : `${trackColor}50`,
-              boxShadow: stem.isMuted ? undefined : `0 4px 15px ${trackColor}25`
+              borderColor: stem.isMuted ? undefined : (isHighContrast ? '#FFFFFF' : `${trackColor}50`),
+              boxShadow: stem.isMuted ? undefined : (isHighContrast ? `0 0 15px ${trackColor}` : `0 4px 15px ${trackColor}25`)
             }}
             animate={{ scale: stem.isMuted ? 0.85 : 1 }}
           >
-            <div className={cn("w-3.5 sm:w-4 md:w-5 h-[1.5px] rounded-full", stem.isMuted ? "bg-white/10" : "")} style={{ backgroundColor: stem.isMuted ? undefined : trackColor }} />
-            <div className={cn("w-3.5 sm:w-4 md:w-5 h-[1.5px] rounded-full", stem.isMuted ? "bg-white/10" : "")} style={{ backgroundColor: stem.isMuted ? undefined : trackColor }} />
+            <div className={cn("w-3.5 sm:w-4 md:w-5 h-[1.5px] rounded-full", stem.isMuted ? "bg-white/10" : "")} style={{ backgroundColor: stem.isMuted ? undefined : (isHighContrast ? '#FFFFFF' : trackColor) }} />
+            <div className={cn("w-3.5 sm:w-4 md:w-5 h-[1.5px] rounded-full", stem.isMuted ? "bg-white/10" : "")} style={{ backgroundColor: stem.isMuted ? undefined : (isHighContrast ? trackColor : trackColor) }} />
           </motion.div>
         </div>
       </div>
@@ -212,21 +239,40 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({ stem, index, onOpenDetails 
                onClick={() => toggleStemMute(stem.id)}
                onContextMenu={(e) => handleMidiRightClick(e, 'stem_mute', `Mute ${stem.name}`, stem.name)}
                className={cn(
-                 "flex-1 rounded-lg flex items-center justify-center transition-all border border-transparent text-[10px]",
-                 stem.isMuted ? "bg-[#FF3B30] text-white border-[#FF3B30]/30 shadow-[0_0_12px_rgba(255,59,48,0.35)]" : "bg-white/5 text-white/40 hover:bg-white/10 hover:text-white"
+                 "flex-1 rounded-lg flex items-center justify-center transition-all border text-[10px]",
+                 stem.isMuted 
+                   ? (isHighContrast 
+                       ? "bg-[#FF0033] text-white border-2 border-white shadow-[0_0_15px_#FF0033] font-black" 
+                       : "bg-[#FF3B30] text-white border-[#FF3B30]/30 shadow-[0_0_12px_rgba(255,59,48,0.35)]") 
+                   : (isHighContrast 
+                       ? "bg-[#181822] text-white border-white/20 hover:border-white/50" 
+                       : "bg-white/5 text-white/40 hover:bg-white/10 hover:text-white border-transparent")
                )}
             >
-               <span className="font-extrabold font-sans">M</span>
+               <span className="font-black font-sans">M</span>
             </button>
             <button
                onClick={() => toggleStemSolo(stem.id)}
                onContextMenu={(e) => handleMidiRightClick(e, 'stem_solo', `Solo ${stem.name}`, stem.name)}
                className={cn(
-                 "flex-1 rounded-lg flex items-center justify-center transition-all border border-transparent text-[10px]",
-                 stem.isSoloed ? "bg-[#FFD60A] text-black border-[#FFD60A]/30 shadow-[0_0_12px_rgba(255,214,10,0.35)]" : "bg-white/5 text-white/40 hover:bg-white/10 hover:text-white"
+                 "flex-1 rounded-lg flex items-center justify-center transition-all border text-[10px]",
+                 stem.isSoloed 
+                   ? (isHighContrast 
+                       ? "bg-[#FFCC00] text-black border-2 border-black shadow-[0_0_15px_#FFCC00] font-black" 
+                       : "bg-[#FFD60A] text-black border-[#FFD60A]/30 shadow-[0_0_12px_rgba(255,214,10,0.35)]") 
+                   : (isHighContrast 
+                       ? "bg-[#181822] text-white border-white/20 hover:border-white/50" 
+                       : "bg-white/5 text-white/40 hover:bg-white/10 hover:text-white border-transparent")
                )}
             >
-               <span className="font-extrabold font-sans">S</span>
+               <span className="font-black font-sans">S</span>
+            </button>
+            <button
+               onClick={handleDeleteTrack}
+               title={`Excluir track ${stem.name}`}
+               className="w-7 rounded-lg flex items-center justify-center transition-all bg-white/5 hover:bg-red-500/20 text-white/30 hover:text-red-400 border border-transparent hover:border-red-500/30 shrink-0"
+            >
+               <Trash2 size={12} />
             </button>
          </div>
       </div>
@@ -523,9 +569,14 @@ const SpectrumAnalyzer: React.FC<SpectrumAnalyzerProps> = ({ stemId, trackColor,
   );
 };
 
-const TrackDetailsModal: React.FC<{ stem: Stem, index: number, onClose: () => void }> = ({ stem, index, onClose }) => {
-  const { updateStemVolume, toggleStemMute, toggleStemSolo, setStemOutput, setStemEQ, setStemCompressor, isPlaying } = usePlayerStore();
+const TrackDetailsModal: React.FC<{ stem: Stem, index: number, onClose: () => void, onRequestDelete: (stem: Stem) => void }> = ({ stem, index, onClose, onRequestDelete }) => {
+  const { updateStemVolume, toggleStemMute, toggleStemSolo, setStemOutput, setStemEQ, setStemCompressor, isPlaying, currentSong, setTimeSignature } = usePlayerStore();
   const trackColor = TRACK_COLORS[index % TRACK_COLORS.length];
+
+  const isClickTrack = stem.name.toLowerCase().includes('click') || 
+                       stem.name.toLowerCase().includes('tap') || 
+                       stem.id.toLowerCase().includes('click') || 
+                       stem.id.toLowerCase().includes('tap');
 
   const compressor = stem.compressor || {
     enabled: false,
@@ -611,9 +662,22 @@ const TrackDetailsModal: React.FC<{ stem: Stem, index: number, onClose: () => vo
                 <p className="text-white/35 text-[9px] uppercase tracking-widest font-black mt-0.5">Track Settings</p>
               </div>
             </div>
-            <button onClick={onClose} className="p-1.5 bg-white/5 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors border border-white/5">
-              <X size={16} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => {
+                  onRequestDelete(stem);
+                  onClose();
+                }}
+                title="Excluir esta track da música"
+                className="p-2 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white rounded-xl transition-all border border-red-500/20 flex items-center gap-1.5 text-[10px] font-extrabold uppercase"
+              >
+                <Trash2 size={14} />
+                <span className="hidden sm:inline">Excluir</span>
+              </button>
+              <button onClick={onClose} className="p-1.5 bg-white/5 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors border border-white/5">
+                <X size={16} />
+              </button>
+            </div>
           </div>
 
           <div className="p-5 flex flex-col gap-5 overflow-y-auto max-h-[80vh]">
@@ -624,6 +688,50 @@ const TrackDetailsModal: React.FC<{ stem: Stem, index: number, onClose: () => vo
               isPlaying={isPlaying} 
               eq={stem.eq || { low: 0, mid: 0, high: 0 }} 
             />
+
+            {/* Time Signature Selector - Exclusively for Click / Tap Track */}
+            {isClickTrack && (
+              <div className="bg-gradient-to-r from-orange-500/10 via-amber-500/10 to-amber-600/10 border border-orange-500/25 rounded-2xl p-4 flex flex-col gap-3 shadow-xl">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-orange-500/20 border border-orange-500/30 flex items-center justify-center text-orange-400">
+                      <Clock size={16} />
+                    </div>
+                    <div>
+                      <span className="text-xs uppercase font-extrabold tracking-wider text-orange-300 block">
+                        Fórmula de Compasso (Métrica do Click)
+                      </span>
+                      <span className="text-[10px] text-white/40 block font-medium">
+                        Ajusta a acentuação do 1º tempo no áudio do click
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-xs font-mono font-black text-orange-300 bg-orange-500/20 border border-orange-500/40 px-3 py-1 rounded-xl shadow-inner">
+                    {currentSong?.timeSignature || "4/4"}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1">
+                  {["4/4", "3/4", "6/8", "2/4", "12/8", "5/4"].map((sig) => {
+                    const isSelected = (currentSong?.timeSignature || "4/4") === sig;
+                    return (
+                      <button
+                        key={sig}
+                        onClick={() => setTimeSignature(sig)}
+                        className={cn(
+                          "py-2.5 px-3 rounded-xl text-xs font-black transition-all border flex flex-col items-center justify-center gap-0.5",
+                          isSelected
+                            ? "bg-gradient-to-b from-orange-400 to-amber-500 text-black border-orange-300 font-extrabold shadow-[0_0_18px_rgba(249,115,22,0.4)] scale-[1.03]"
+                            : "bg-black/50 text-white/70 border-white/10 hover:bg-white/10 hover:text-white hover:border-white/20"
+                        )}
+                      >
+                        <span className="text-sm tracking-tight font-black">{sig}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="flex flex-col sm:flex-row gap-5">
               {/* Column 1: Primary Controls */}
@@ -1020,18 +1128,338 @@ const TrackDetailsModal: React.FC<{ stem: Stem, index: number, onClose: () => vo
   );
 };
 
+interface AddTrackModalProps {
+  onClose: () => void;
+}
+
+const AddTrackModal: React.FC<AddTrackModalProps> = ({ onClose }) => {
+  const { addStemToCurrentSong, currentSong } = usePlayerStore();
+  const [file, setFile] = useState<File | null>(null);
+  const [trackName, setTrackName] = useState('');
+  const [outputRouting, setOutputRouting] = useState<number>(3);
+  const [isLoading, setIsLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const quickTemplates = [
+    'CLICK / TAP',
+    'VOCAIS',
+    'BATERIA',
+    'BAIXO',
+    'GUITARRAS',
+    'VIOLÃO',
+    'TECLAS / PIANO',
+    'SYNTH / PADS',
+    'PERCUSSÃO',
+    'BACKING VOCALS',
+    'GUIA VERBAL',
+    'EFEITOS / FX'
+  ];
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const selectedFile = e.target.files[0];
+      setFile(selectedFile);
+      if (!trackName) {
+        const cleanName = selectedFile.name.replace(/\.[^/.]+$/, "");
+        setTrackName(cleanName.toUpperCase());
+      }
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!file) return;
+
+    setIsLoading(true);
+    try {
+      await addStemToCurrentSong(trackName || file.name, file, outputRouting);
+      onClose();
+    } catch (err) {
+      console.error("Failed to add stem", err);
+      alert('Erro ao carregar o arquivo de áudio. Verifique se o formato é válido.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return createPortal(
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.9, y: 20 }}
+        className="w-full max-w-lg bg-[#0d0d12] border border-white/15 rounded-[2rem] shadow-2xl overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between p-5 border-b border-white/10 bg-gradient-to-r from-cyan-500/15 via-blue-500/10 to-transparent">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
+              <Plus size={20} />
+            </div>
+            <div>
+              <h3 className="text-white font-extrabold text-base tracking-normal uppercase">Adicionar Nova Track</h3>
+              <p className="text-white/40 text-[10px] uppercase font-bold tracking-wider mt-0.5">
+                Música: <span className="text-cyan-300 font-extrabold">{currentSong?.title}</span>
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 bg-white/5 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors border border-white/5">
+            <X size={16} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-5">
+          <div className="flex flex-col gap-2">
+            <label className="text-[10px] font-black uppercase text-white/50 tracking-wider">
+              1. Selecionar Arquivo de Áudio
+            </label>
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className={cn(
+                "border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all",
+                file
+                  ? "border-cyan-500/50 bg-cyan-500/10 shadow-[0_0_20px_rgba(6,182,212,0.15)]"
+                  : "border-white/15 bg-white/[0.02] hover:bg-white/[0.05] hover:border-cyan-400/40"
+              )}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <div className={cn(
+                "w-12 h-12 rounded-2xl flex items-center justify-center transition-transform",
+                file ? "bg-cyan-500 text-black scale-110 shadow-lg" : "bg-white/10 text-white/60"
+              )}>
+                {file ? <Check size={24} /> : <Upload size={24} />}
+              </div>
+              <div className="text-center">
+                {file ? (
+                  <>
+                    <p className="text-sm font-extrabold text-white truncate max-w-xs">{file.name}</p>
+                    <p className="text-[10px] text-cyan-300 font-mono mt-1">{(file.size / (1024 * 1024)).toFixed(2)} MB • Pronto para carregar</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs font-bold text-white">Clique para escolher ou arraste o áudio</p>
+                    <p className="text-[10px] text-white/35 uppercase tracking-wider font-semibold mt-1">MP3, WAV, AAC, M4A, FLAC, OGG</p>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label className="text-[10px] font-black uppercase text-white/50 tracking-wider">
+              2. Nome da Track / Instrumento
+            </label>
+            <input
+              type="text"
+              value={trackName}
+              onChange={(e) => setTrackName(e.target.value)}
+              placeholder="Ex: VIOLÃO EXTRA, GUITARRAS, BACKING VOCAL..."
+              className="w-full bg-black/60 border border-white/15 rounded-xl px-4 py-3 text-sm font-bold text-white uppercase outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all placeholder:text-white/20"
+              required
+            />
+
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {quickTemplates.map((tpl) => (
+                <button
+                  key={tpl}
+                  type="button"
+                  onClick={() => setTrackName(tpl)}
+                  className={cn(
+                    "px-2.5 py-1 rounded-lg text-[9px] font-extrabold uppercase transition-all border",
+                    trackName === tpl
+                      ? "bg-cyan-500 text-black border-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.4)]"
+                      : "bg-white/5 text-white/60 border-white/10 hover:bg-white/10 hover:text-white"
+                  )}
+                >
+                  {tpl}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label className="text-[10px] font-black uppercase text-white/50 tracking-wider">
+              3. Roteamento de Saída
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { value: 3, label: 'Stereo', sub: 'Padrão' },
+                { value: 1, label: 'L (Esquerda)', sub: 'Click / Guia' },
+                { value: 2, label: 'R (Direita)', sub: 'Playbacks' }
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setOutputRouting(opt.value)}
+                  className={cn(
+                    "p-2.5 rounded-xl border flex flex-col items-center text-center transition-all",
+                    outputRouting === opt.value
+                      ? "bg-cyan-500/20 border-cyan-400 text-cyan-300 font-extrabold shadow-[0_0_12px_rgba(6,182,212,0.25)]"
+                      : "bg-black/40 border-white/10 text-white/50 hover:bg-white/5 hover:text-white"
+                  )}
+                >
+                  <span className="text-xs font-black">{opt.label}</span>
+                  <span className="text-[9px] opacity-60 font-medium">{opt.sub}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isLoading}
+              className="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 font-bold text-xs uppercase tracking-wider transition-all"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={!file || isLoading}
+              className={cn(
+                "px-6 py-2.5 rounded-xl font-extrabold text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-lg",
+                file && !isLoading
+                  ? "bg-gradient-to-r from-cyan-400 to-blue-500 text-black hover:scale-105 shadow-[0_0_20px_rgba(6,182,212,0.4)]"
+                  : "bg-white/10 text-white/30 cursor-not-allowed"
+              )}
+            >
+              {isLoading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                  Carregando Áudio...
+                </>
+              ) : (
+                <>
+                  <Plus size={16} />
+                  Adicionar Track
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </motion.div>,
+    document.body
+  );
+};
+
+interface DeleteTrackConfirmModalProps {
+  stem: Stem;
+  onClose: () => void;
+  onConfirm: () => Promise<void>;
+}
+
+const DeleteTrackConfirmModal: React.FC<DeleteTrackConfirmModalProps> = ({ stem, onClose, onConfirm }) => {
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleConfirm = async () => {
+    setIsDeleting(true);
+    try {
+      await onConfirm();
+    } catch (err) {
+      console.error("Error deleting track:", err);
+    } finally {
+      setIsDeleting(false);
+      onClose();
+    }
+  };
+
+  return createPortal(
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.9, y: 20 }}
+        className="w-full max-w-sm bg-[#0d0d14] border border-red-500/40 rounded-[2rem] shadow-[0_0_50px_rgba(239,68,68,0.3)] overflow-hidden p-6 flex flex-col gap-5 text-center"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="w-16 h-16 rounded-2xl bg-red-500/20 border border-red-500/40 text-red-500 flex items-center justify-center mx-auto shadow-lg shadow-red-500/20 animate-pulse">
+          <Trash2 size={32} />
+        </div>
+
+        <div>
+          <h3 className="text-white font-extrabold text-xl uppercase tracking-tight">Excluir Track?</h3>
+          <p className="text-white/70 text-xs font-semibold mt-2 leading-relaxed">
+            Deseja apagar a track <span className="text-red-400 font-extrabold uppercase">{stem.name}</span> desta música?
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isDeleting}
+            className="flex-1 py-3 rounded-xl bg-white/10 hover:bg-white/15 text-white/80 font-extrabold text-xs uppercase tracking-wider transition-all border border-white/10"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={isDeleting}
+            className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs uppercase tracking-wider transition-all shadow-lg shadow-red-600/40 flex items-center justify-center gap-2 border border-red-400/30"
+          >
+            {isDeleting ? (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <>
+                <Trash2 size={16} />
+                Sim, Excluir
+              </>
+            )}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>,
+    document.body
+  );
+};
+
 export const Mixer: React.FC = () => {
-  const { currentSong, resetAllVolumesToZeroDb } = usePlayerStore();
+  const { currentSong, resetAllVolumesToZeroDb, themeMode, removeStemFromCurrentSong } = usePlayerStore();
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
+  const [isAddTrackOpen, setIsAddTrackOpen] = useState(false);
+  const [stemToDelete, setStemToDelete] = useState<Stem | null>(null);
 
   if (!currentSong) return null;
 
+  const isHighContrast = themeMode === 'high-contrast';
   const selectedStem = currentSong.stems.find(s => s.id === selectedTrackId);
 
   return (
-    <div className="flex-1 flex overflow-x-auto bg-white/[0.02] backdrop-blur-md border border-white/5 custom-scrollbar relative h-full rounded-[20px] mx-1 sm:mx-0">
+    <div 
+      className={cn(
+         "flex-1 flex overflow-x-auto custom-scrollbar relative h-full rounded-[20px] mx-1 sm:mx-0 transition-colors duration-300",
+         isHighContrast 
+           ? "bg-[#030305] border-2 border-white/25 shadow-2xl" 
+           : "bg-white/[0.02] backdrop-blur-md border border-white/5"
+      )}
+    >
       {/* Background Texture Grid */}
-      <div className="absolute inset-0 opacity-[0.02] pointer-events-none" 
+      <div 
+        className={cn(
+           "absolute inset-0 pointer-events-none transition-opacity duration-300",
+           isHighContrast ? "opacity-[0.08]" : "opacity-[0.02]"
+        )} 
         style={{ 
           backgroundImage: 'radial-gradient(circle at 1.5px 1.5px, white 1px, transparent 0)',
           backgroundSize: '18px 18px'
@@ -1039,11 +1467,37 @@ export const Mixer: React.FC = () => {
       />
       
       {currentSong.stems.map((stem, index) => (
-        <ChannelStrip key={stem.id} stem={stem} index={index} onOpenDetails={() => setSelectedTrackId(stem.id)} />
+        <ChannelStrip 
+          key={stem.id} 
+          stem={stem} 
+          index={index} 
+          onOpenDetails={() => setSelectedTrackId(stem.id)} 
+          onRequestDelete={(s) => setStemToDelete(s)}
+        />
       ))}
 
+      {/* Botão para Adicionar Nova Track */}
+      <div className={cn(
+         "flex flex-col items-center justify-center w-20 sm:w-24 md:w-28 shrink-0 h-full p-3 text-center transition-all border-l border-white/5",
+         isHighContrast ? "border-l-2 border-white/20 bg-[#08080c] hover:bg-[#101018]" : "bg-cyan-500/[0.02] hover:bg-cyan-500/[0.06]"
+      )}>
+         <button
+           onClick={() => setIsAddTrackOpen(true)}
+           title="Adicionar nova track/instrumento a esta música"
+           className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-cyan-500/15 border-2 border-cyan-400/40 hover:border-cyan-400 hover:bg-cyan-500 hover:text-black hover:shadow-[0_0_20px_rgba(6,182,212,0.6)] text-cyan-300 transition-all flex flex-col items-center justify-center gap-1 group shadow-lg"
+         >
+           <Plus size={22} className="group-hover:scale-125 transition-transform" />
+         </button>
+         <span className={cn(
+            "text-[9px] md:text-[10px] font-black mt-2.5 uppercase tracking-wider leading-tight text-cyan-300"
+         )}>Adicionar<br/>Track</span>
+      </div>
+
       {/* Botão de reset rápido para 0dB */}
-      <div className="flex flex-col items-center justify-center w-16 sm:w-20 md:w-24 shrink-0 h-full border-l border-white/5 bg-white/[0.01] hover:bg-white/[0.03] transition-all p-3 text-center">
+      <div className={cn(
+         "flex flex-col items-center justify-center w-16 sm:w-20 md:w-24 shrink-0 h-full p-3 text-center transition-all",
+         isHighContrast ? "border-l-2 border-white/20 bg-[#08080c] hover:bg-[#101018]" : "border-l border-white/5 bg-white/[0.01] hover:bg-white/[0.03]"
+      )}>
          <span className="text-[8px] md:text-[9.5px] font-black uppercase tracking-widest text-[#2ECC71] drop-shadow-[0_0_4px_rgba(46,204,113,0.3)] mb-3">0dB nominal</span>
          <button
            onClick={resetAllVolumesToZeroDb}
@@ -1052,7 +1506,10 @@ export const Mixer: React.FC = () => {
          >
            <Activity size={18} className="group-hover:scale-110 transition-transform animate-pulse" />
          </button>
-         <span className="text-[8px] md:text-[9.5px] font-bold text-white/40 mt-3 uppercase leading-tight">Resetar<br/>Volumes</span>
+         <span className={cn(
+            "text-[8px] md:text-[9.5px] font-bold mt-3 uppercase leading-tight",
+            isHighContrast ? "text-white/80" : "text-white/40"
+         )}>Resetar<br/>Volumes</span>
       </div>
 
       <div className="min-w-[40px]" />
@@ -1064,8 +1521,25 @@ export const Mixer: React.FC = () => {
              stem={selectedStem} 
              index={currentSong.stems.findIndex(s => s.id === selectedStem.id)}
              onClose={() => setSelectedTrackId(null)} 
+             onRequestDelete={(s) => setStemToDelete(s)}
            />
          )}
+        {isAddTrackOpen && (
+           <AddTrackModal
+             key="add-track-modal"
+             onClose={() => setIsAddTrackOpen(false)}
+           />
+        )}
+        {stemToDelete && (
+           <DeleteTrackConfirmModal
+             key="delete-track-confirm-modal"
+             stem={stemToDelete}
+             onClose={() => setStemToDelete(null)}
+             onConfirm={async () => {
+               await removeStemFromCurrentSong(stemToDelete.id);
+             }}
+           />
+        )}
       </AnimatePresence>
     </div>
   );

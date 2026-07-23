@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { getCoverUrl } from '../lib/coverArt';
+import { detectBeatAndGenerateClick, generateClickPCM, refineOffsetForBpm } from '../utils/beatDetector';
 
 export const StemSplitter: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -60,7 +61,10 @@ export const StemSplitter: React.FC = () => {
     setYoutubeError('');
     setVideoInfo(null);
     try {
-      const res = await fetch(`/api/youtube-info?url=${encodeURIComponent(youtubeUrl)}`);
+      const res = await fetch(`/api/youtube-info?url=${encodeURIComponent(youtubeUrl)}`).catch((networkErr) => {
+        throw new Error('Erro de conexão ao servidor. Verifique sua conexão com a internet ou tente novamente.');
+      });
+
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || 'Não foi possível buscar as informações do vídeo.');
@@ -82,10 +86,13 @@ export const StemSplitter: React.FC = () => {
     setDownloadProgress(0);
 
     try {
-      const response = await fetch(`/api/youtube-download?url=${encodeURIComponent(youtubeUrl)}`);
+      const response = await fetch(`/api/youtube-download?url=${encodeURIComponent(youtubeUrl)}`).catch((networkErr) => {
+        throw new Error('Erro de rede ao baixar o áudio do YouTube. Caso persista, envie o arquivo MP3/WAV diretamente.');
+      });
+
       if (!response.ok) {
         const errJson = await response.json().catch(() => ({}));
-        throw new Error(errJson.error || 'Erro ao baixar áudio do YouTube');
+        throw new Error(errJson.error || 'Erro ao baixar áudio do YouTube. Envie o arquivo de áudio diretamente.');
       }
 
       setStatus('Carregando áudio...');
@@ -96,7 +103,7 @@ export const StemSplitter: React.FC = () => {
     } catch (err: any) {
       console.error(err);
       setStatus(`Erro: ${err.message || String(err)}`);
-      setTimeout(() => setIsProcessing(false), 4000);
+      setTimeout(() => setIsProcessing(false), 5000);
     }
   };
 
@@ -112,18 +119,26 @@ export const StemSplitter: React.FC = () => {
     setDownloadProgress(0);
 
     try {
-      const audioContext = new AudioContext({ sampleRate: CONSTANTS.SAMPLE_RATE });
+      // Configure ONNX Runtime Web WASM CDN paths and thread capabilities
+      ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/';
+      const hasSharedArrayBuffer = typeof self !== 'undefined' && typeof (self as any).SharedArrayBuffer !== 'undefined';
+      ort.env.wasm.numThreads = hasSharedArrayBuffer ? Math.min(navigator.hardwareConcurrency || 4, 4) : 1;
+
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const audioContext = new AudioContextClass({ sampleRate: CONSTANTS.SAMPLE_RATE || 44100 });
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
       
       setStatus('Decodificando áudio...');
       const arrayBuffer = await selectedFile.arrayBuffer();
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
       
       const leftChannel = audioBuffer.getChannelData(0);
       const rightChannel = audioBuffer.numberOfChannels > 1 
         ? audioBuffer.getChannelData(1) 
         : leftChannel;
 
-      ort.env.wasm.numThreads = navigator.hardwareConcurrency || 4;
       if ('gpu' in navigator) {
         try {
           const adapter = await (navigator as any).gpu.requestAdapter();
@@ -157,6 +172,62 @@ export const StemSplitter: React.FC = () => {
 
       setStatus('Executando separação (Split)...');
       const result = await processor.separate(leftChannel, rightChannel);
+
+      setStatus('Sincronizando Click/Metrônomo (BPM)...');
+
+      const songTitle = customTitle || selectedFile.name.replace(/\.[^/.]+$/, "");
+      const songArtist = customArtist || 'AI Processed';
+      const coverUrl = customCoverUrl || getCoverUrl(songTitle, songArtist);
+
+      // Use drum stem as primary beat detection source, falling back to full audio if drum stem is silent
+      const hasDrums = result.drums.left.some(v => Math.abs(v) > 0.001);
+      const beatLeft = hasDrums ? result.drums.left : leftChannel;
+      const beatRight = hasDrums ? result.drums.right : rightChannel;
+
+      const beatAnalysis = detectBeatAndGenerateClick(beatLeft, beatRight, CONSTANTS.SAMPLE_RATE || 44100);
+
+      let finalBpm = beatAnalysis.bpm || 120;
+      let finalTimeSig = '4/4';
+      let finalOffset = beatAnalysis.offset || 0;
+
+      setStatus('IA Decifrando Tempo e Compasso...');
+      try {
+        const aiResponse = await fetch('/api/ai-tempo-detect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: songTitle,
+            artist: songArtist,
+            dspBpm: beatAnalysis.bpm,
+            dspOffset: beatAnalysis.offset,
+            duration: audioBuffer.duration,
+          })
+        });
+
+        if (aiResponse.ok) {
+          const aiData = await aiResponse.json();
+          if (aiData.bpm && typeof aiData.bpm === 'number') {
+            finalBpm = aiData.bpm;
+          }
+          if (aiData.timeSignature && typeof aiData.timeSignature === 'string') {
+            finalTimeSig = aiData.timeSignature;
+          }
+        }
+      } catch (err) {
+        console.warn('Falha na IA para tempo, mantendo detecção DSP:', err);
+      }
+
+      // Refine 100% synchronized beat offset for the final BPM
+      finalOffset = refineOffsetForBpm(beatLeft, beatRight, finalBpm, CONSTANTS.SAMPLE_RATE || 44100);
+
+      // Generate click track 100% synchronized with AI deciphered BPM & Time Signature
+      const { clickLeft, clickRight } = generateClickPCM(
+        leftChannel.length,
+        finalBpm,
+        finalOffset,
+        finalTimeSig,
+        CONSTANTS.SAMPLE_RATE || 44100
+      );
 
       setStatus('Renderizando stems...');
       
@@ -206,21 +277,22 @@ export const StemSplitter: React.FC = () => {
 
       const songId = Math.random().toString(36).substring(7);
 
+      const clickData = createWavData(clickLeft, clickRight, 'click.wav');
       const drumsData = createWavData(result.drums.left, result.drums.right, 'drums.wav');
       const bassData = createWavData(result.bass.left, result.bass.right, 'bass.wav');
       const otherData = createWavData(result.other.left, result.other.right, 'other.wav');
       const vocalsData = createWavData(result.vocals.left, result.vocals.right, 'vocals.wav');
-
-      const songTitle = customTitle || selectedFile.name.replace(/\.[^/.]+$/, "");
-      const songArtist = customArtist || 'AI Processed';
-      const coverUrl = customCoverUrl || getCoverUrl(songTitle, songArtist);
 
       addProcessedSong({
         id: songId,
         title: songTitle,
         artist: songArtist,
         coverUrl: coverUrl,
+        bpm: finalBpm,
+        timeSignature: finalTimeSig,
+        firstBeatOffset: finalOffset,
         stems: [
+          { id: `${songId}-click`, name: 'Click / Tap', file: clickData.url, originalFile: clickData.file, output: 3, pan: 0, volume: 0.5, isMuted: false, isSoloed: false },
           { id: `${songId}-vocals`, name: 'Vocals', file: vocalsData.url, originalFile: vocalsData.file, output: 3, pan: 0, volume: 0.5, isMuted: false, isSoloed: false },
           { id: `${songId}-drums`, name: 'Drums', file: drumsData.url, originalFile: drumsData.file, output: 3, pan: 0, volume: 0.5, isMuted: false, isSoloed: false },
           { id: `${songId}-bass`, name: 'Bass', file: bassData.url, originalFile: bassData.file, output: 3, pan: 0, volume: 0.5, isMuted: false, isSoloed: false },

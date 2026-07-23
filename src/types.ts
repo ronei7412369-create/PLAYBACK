@@ -38,8 +38,10 @@ export interface Song {
   artist: string;
   coverUrl?: string; // Music banner / cover artwork
   bpm: number;
+  originalBpm?: number;
   key: string;
   timeSignature: string;
+  firstBeatOffset?: number;
   duration: number;
   stems: Stem[];
   markers: Marker[];
@@ -58,6 +60,7 @@ export interface PlayerState {
   isAdmin: boolean;
   user: any | null; // Firebase user
   isStageMode: boolean;
+  themeMode: 'default' | 'high-contrast';
   isLoadingSong: boolean;
   isSavingSetlist?: boolean;
   isSidebarOpen: boolean;
@@ -96,6 +99,8 @@ export interface PlayerState {
   createInternalUser?: (e: string, p: string, d?: string) => Promise<void>;
   logout: () => void;
   toggleStageMode: () => void;
+  setThemeMode: (mode: 'default' | 'high-contrast') => void;
+  toggleThemeMode: () => void;
   setShowSidebar: (show: boolean) => void;
 
   updateSongMetadata: (id: string, title: string, artist: string, coverUrl?: string, bpm?: number, key?: string) => void;
@@ -117,7 +122,7 @@ export interface PlayerState {
   loadCustomPads: () => Promise<void>;
 
   importSong: (song: Song, buffers?: {id:string, buffer:ArrayBuffer}[]) => void;
-  addProcessedSong: (song: Omit<Song, 'duration' | 'bpm' | 'key' | 'timeSignature' | 'markers'>) => void;
+  addProcessedSong: (song: Omit<Song, 'duration' | 'bpm' | 'key' | 'timeSignature' | 'markers'> & { bpm?: number; timeSignature?: string }) => void;
   setCurrentSong: (song: Song) => Promise<void>;
   preloadSong: (songId: string) => Promise<void>;
   triggerBackgroundPreload: () => Promise<void>;
@@ -137,7 +142,9 @@ export interface PlayerState {
   
   tapTempo: () => void;
   updateBpm: (delta: number) => void;
+  setBpm: (bpm: number) => void;
   cycleTimeSignature: () => void;
+  setTimeSignature: (timeSig: string) => void;
   
   toggleLoop: () => void;
   toggleInfiniteLoop: () => void;
@@ -158,6 +165,8 @@ export interface PlayerState {
   ) => void;
 
   resetAllVolumesToZeroDb: () => void;
+  addStemToCurrentSong: (name: string, file: File, output?: number) => Promise<void>;
+  removeStemFromCurrentSong: (stemId: string) => Promise<void>;
 
   initPersistence: () => Promise<void>;
 }

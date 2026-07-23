@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { usePlayerStore } from '../store/usePlayerStore';
-import { Volume2, Settings, Hash, Key, ShieldCheck, Headphones, MonitorPlay, LogOut, Menu, SlidersHorizontal, X, Users, Download, RotateCcw } from 'lucide-react';
+import { Volume2, Settings, Hash, Key, ShieldCheck, Headphones, MonitorPlay, LogOut, Menu, SlidersHorizontal, X, Users, Download, RotateCcw, Contrast } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { AdminModal } from './AdminModal';
@@ -16,7 +16,7 @@ const AVAILABLE_KEYS = [
 ];
 
 export const Header: React.FC = () => {
-  const { currentSong, globalBpm, masterVolume, setMasterVolume, masterEq, setMasterEQ, isPlaying, toggleMetronome, metronomeEnabled, isLRSplit, toggleLRSplit, isStageMode, toggleStageMode, logout, isSidebarOpen, setShowSidebar, tapTempo, updateBpm, cycleTimeSignature, pitchShift, setPitchShift, isAdmin, updateSongKey, user } = usePlayerStore();
+  const { currentSong, globalBpm, masterVolume, setMasterVolume, masterEq, setMasterEQ, isPlaying, toggleMetronome, metronomeEnabled, isLRSplit, toggleLRSplit, isStageMode, toggleStageMode, themeMode, toggleThemeMode, logout, isSidebarOpen, setShowSidebar, tapTempo, updateBpm, cycleTimeSignature, pitchShift, setPitchShift, isAdmin, updateSongKey, user } = usePlayerStore();
   const [showEq, setShowEq] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [showMidiMap, setShowMidiMap] = useState(false);
@@ -276,13 +276,29 @@ export const Header: React.FC = () => {
 
             <button 
               onClick={toggleStageMode}
-              title={isStageMode ? "Exit Stage Mode" : "Enter Stage Mode"}
+              title={isStageMode ? "Sair do Modo Palco" : "Modo Palco"}
               className={cn(
                 "p-1.5 sm:p-2 md:p-2.5 rounded-xl transition-all shrink-0",
                 isStageMode ? "bg-[#00A3FF]/20 text-[#00A3FF]" : "text-white/40 hover:text-white hover:bg-white/5"
               )}
             >
               <MonitorPlay size={16} className="sm:w-[18px] sm:h-[18px] md:w-5 md:h-5" />
+            </button>
+
+            <button 
+              onClick={toggleThemeMode}
+              title={`Tema Visual: ${themeMode === 'high-contrast' ? 'Alto Contraste' : 'Padrão'}`}
+              className={cn(
+                "p-1.5 sm:p-2 md:p-2.5 rounded-xl transition-all shrink-0 flex items-center gap-1.5",
+                themeMode === 'high-contrast' 
+                  ? "bg-amber-400/20 text-amber-300 border border-amber-400/40 shadow-[0_0_12px_rgba(251,191,36,0.25)]" 
+                  : "text-white/40 hover:text-white hover:bg-white/5 border border-transparent"
+              )}
+            >
+              <Contrast size={16} className="sm:w-[18px] sm:h-[18px] md:w-5 md:h-5" />
+              <span className="hidden xl:inline text-[9px] font-black uppercase tracking-wider">
+                {themeMode === 'high-contrast' ? 'Alto Contraste' : 'Padrão'}
+              </span>
             </button>
             <button 
               onClick={() => setShowMidiMap(true)}

@@ -12,7 +12,7 @@ export const TransportControls: React.FC = () => {
     isInfiniteLoop, toggleInfiniteLoop,
     isFadeOut, triggerFadeOut: toggleFadeOut,
     playbackRate, setPlaybackRate,
-    currentSong, globalBpm, tapTempo, updateBpm
+    currentSong, globalBpm, tapTempo, updateBpm, setBpm
   } = usePlayerStore();
 
   const [isTapFlashed, setIsTapFlashed] = React.useState(false);
@@ -269,10 +269,19 @@ export const TransportControls: React.FC = () => {
               -
             </button>
             <div className="flex items-baseline gap-0.5 justify-center flex-1">
-              <span className="text-white font-black text-sm md:text-base tabular-nums leading-none">
-                {bpm}
-              </span>
-              <span className="text-[6px] text-white/40 font-bold uppercase">BPM</span>
+              <input
+                type="number"
+                value={bpm}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  if (!isNaN(val)) setBpm(val);
+                }}
+                className="w-10 bg-transparent text-white font-black text-sm md:text-base tabular-nums leading-none text-center focus:outline-none focus:bg-white/10 rounded [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                min={30}
+                max={300}
+                title="Digitar BPM diretamente"
+              />
+              <span className="text-[6px] text-white/40 font-bold uppercase pointer-events-none">BPM</span>
             </div>
             <button 
               onClick={() => updateBpm(1)}

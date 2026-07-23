@@ -2,12 +2,12 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMidiStore } from '../store/useMidiStore';
 import { usePlayerStore } from '../store/usePlayerStore';
-import { X, Settings, CircleDot, Trash2, ListMusic, AudioLines, Music } from 'lucide-react';
+import { X, Settings, CircleDot, Trash2, ListMusic, AudioLines, Music, Contrast } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export const MidiMapModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
   const { inputs, selectedInputId, mappings, isLearning, learningAction, learningLog, setSelectedInputId, setLearningAction, clearLearning, removeMapping } = useMidiStore();
-  const { currentSong } = usePlayerStore();
+  const { currentSong, themeMode, setThemeMode } = usePlayerStore();
 
   const handleLearn = (action: string, payload?: string) => {
     if (isLearning && learningAction?.action === action && learningAction?.payload === payload) {
@@ -96,6 +96,42 @@ export const MidiMapModal: React.FC<{ isOpen: boolean; onClose: () => void }> = 
             
             <div className="p-6 overflow-y-auto custom-scrollbar flex flex-col gap-8">
               
+              {/* Theme Settings */}
+              <div className="flex flex-col gap-3">
+                 <label className="text-[10px] uppercase font-black text-white/40 tracking-widest pl-1 border-l-2 border-[#00A3FF] flex items-center gap-2">
+                    <Contrast size={12} /> Tema Visual da Interface (Mixer & Waveform)
+                 </label>
+                 <div className="grid grid-cols-2 gap-3">
+                    <button
+                       type="button"
+                       onClick={() => setThemeMode('default')}
+                       className={cn(
+                          "p-3.5 rounded-xl border flex flex-col items-center gap-1.5 transition-all text-xs font-bold",
+                          themeMode === 'default'
+                             ? "bg-[#00A3FF]/15 border-[#00A3FF] text-[#00A3FF] shadow-[0_0_15px_rgba(0,163,255,0.2)]"
+                             : "bg-black/40 border-white/10 text-white/50 hover:bg-white/5 hover:text-white"
+                       )}
+                    >
+                       <span className="font-extrabold uppercase tracking-wider text-[11px]">Tema Padrão</span>
+                       <span className="text-[10px] text-white/40 font-normal">Escuro com desfoques suaves e tons equilibrados</span>
+                    </button>
+
+                    <button
+                       type="button"
+                       onClick={() => setThemeMode('high-contrast')}
+                       className={cn(
+                          "p-3.5 rounded-xl border flex flex-col items-center gap-1.5 transition-all text-xs font-bold",
+                          themeMode === 'high-contrast'
+                             ? "bg-amber-400/20 border-amber-400 text-amber-300 shadow-[0_0_15px_rgba(251,191,36,0.25)]"
+                             : "bg-black/40 border-white/10 text-white/50 hover:bg-white/5 hover:text-white"
+                       )}
+                    >
+                       <span className="font-extrabold uppercase tracking-wider text-[11px] text-amber-300">Alto Contraste</span>
+                       <span className="text-[10px] text-white/40 font-normal">Preto profundo, bordas nítidas e cores de alto destaque</span>
+                    </button>
+                 </div>
+              </div>
+
               <div className="flex flex-col gap-3">
                  <label className="text-[10px] uppercase font-black text-white/40 tracking-widest pl-1 border-l-2 border-[#00A3FF]">Dispositivo de Entrada</label>
                  <select 

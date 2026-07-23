@@ -116,7 +116,7 @@ export class AudioEngine {
   }
 
   public async preloadCustomPad(note: string, arrayBuffer: ArrayBuffer) {
-     const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
+     const audioBuffer = await this.context.decodeAudioData(arrayBuffer.slice(0));
      this.padDecodedCache.set(note, audioBuffer);
   }
 
@@ -311,7 +311,7 @@ export class AudioEngine {
 
   public async preloadStemFromArrayBuffer(id: string, arrayBuffer: ArrayBuffer) {
     if (!this.decodedCache.has(id)) {
-      const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
+      const audioBuffer = await this.context.decodeAudioData(arrayBuffer.slice(0));
       this.decodedCache.set(id, audioBuffer);
     }
   }
@@ -331,11 +331,34 @@ export class AudioEngine {
     }
   }
 
-  public async loadStemFromArrayBuffer(id: string, arrayBuffer: ArrayBuffer): Promise<number> {
+  public async loadStemFromArrayBuffer(id: string, arrayBuffer: ArrayBuffer, forceRedecode: boolean = false): Promise<number> {
+    if (forceRedecode) {
+      this.decodedCache.delete(id);
+    }
     let audioBuffer = this.decodedCache.get(id);
     if (!audioBuffer) {
-      audioBuffer = await this.context.decodeAudioData(arrayBuffer);
+      audioBuffer = await this.context.decodeAudioData(arrayBuffer.slice(0));
       this.decodedCache.set(id, audioBuffer);
+    }
+
+    const existingStem = this.stems.get(id);
+    if (existingStem) {
+      if (existingStem.source) {
+        try { existingStem.source.stop(); } catch (e) {}
+        existingStem.source = null;
+      }
+      existingStem.buffer = audioBuffer;
+
+      if (this.isPlaying) {
+        const currentTime = this.getCurrentTime();
+        const source = this.context.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(existingStem.gain);
+        source.playbackRate.value = this.playbackRate;
+        source.start(0, currentTime);
+        existingStem.source = source;
+      }
+      return audioBuffer.duration;
     }
     
     // Create Nodes
@@ -397,12 +420,9 @@ export class AudioEngine {
     return audioBuffer.duration;
   }
 
-
-
-  public async loadStem(id: string, file: File): Promise<number> {
+  public async loadStem(id: string, file: File, forceRedecode: boolean = false): Promise<number> {
     const arrayBuffer = await file.arrayBuffer();
-    // Keep a copy in memory to pass to storage if needed, but for now we just decode
-    return this.loadStemFromArrayBuffer(id, arrayBuffer);
+    return this.loadStemFromArrayBuffer(id, arrayBuffer, forceRedecode);
   }
 
   public getDuration(): number {
@@ -707,6 +727,16 @@ export class AudioEngine {
     // Normalize
     const maxPeak = Math.max(...peaks) || 1;
     return peaks.map(p => (p / maxPeak) * 100);
+  }
+
+  public removeStem(id: string) {
+    const stem = this.stems.get(id);
+    if (stem) {
+      if (stem.source) {
+        try { stem.source.stop(); } catch (e) {}
+      }
+      this.stems.delete(id);
+    }
   }
 
   public clearStems() {

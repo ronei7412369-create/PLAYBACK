@@ -1,9 +1,10 @@
 import { create } from 'zustand';
-import { PlayerState, Song } from '../types';
+import { PlayerState, Song, Stem } from '../types';
 import { audioEngine } from '../services/audioEngine';
 import { storageEngine } from '../services/storageEngine';
 import { getCoverUrl } from '../lib/coverArt';
 import { detectKeyAndBpm } from '../lib/songHelpers';
+import { generateClickPCM, createWavFileFromPCM } from '../utils/beatDetector';
 
 import { auth, signInWithGoogle, signOut, signInWithEmail, signUpWithEmail, createInternalUserWithEmail, db } from '../services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -106,6 +107,7 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
   isAdmin: false,
   user: null,
   isStageMode: false,
+  themeMode: (typeof window !== 'undefined' && (localStorage.getItem('app_theme_mode') as 'default' | 'high-contrast')) || 'default',
   isLoadingSong: false,
   isSavingSetlist: false,
   isSidebarOpen: false,
@@ -198,9 +200,9 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
     const fullSong: Song = {
       ...partialSong,
       duration: 0, // We could try to read duration but 0 is fine until decoded
-      bpm: detectedBpm,
+      bpm: partialSong.bpm || detectedBpm,
       key: detectedKey,
-      timeSignature: '4/4',
+      timeSignature: partialSong.timeSignature || '4/4',
       markers: [],
       order: get().setlist.length
     };
@@ -274,13 +276,20 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
        }
        
        const maxDuration = audioEngine.getDuration();
-       if (song.duration === 0 && maxDuration > 0) {
+       if ((song.duration === 0 || !song.duration) && maxDuration > 0) {
           song.duration = maxDuration;
-          const { setlist } = get();
-          set({ setlist: setlist.map(s => s.id === song.id ? {...s, duration: maxDuration} : s) });
-          // Optionally save to DB again without stems just to update duration
-          storageEngine.saveSong({...song, duration: maxDuration}, []).catch(() => {});
        }
+       
+       if (!song.waveformPeaks || song.waveformPeaks.length === 0) {
+          const extractedPeaks = audioEngine.extractPeaks(120);
+          if (extractedPeaks && extractedPeaks.length > 0) {
+             song.waveformPeaks = extractedPeaks;
+          }
+       }
+
+       const { setlist } = get();
+       set({ setlist: setlist.map(s => s.id === song.id ? { ...s, duration: song.duration, waveformPeaks: song.waveformPeaks } : s) });
+       storageEngine.saveSong({ ...song }, []).catch(() => {});
        
        // Force eq and compressor re-application with defaults/fallbacks to prevent leakage
        const hasAnySolo = song.stems?.some(s => s.isSoloed) ?? false;
@@ -370,11 +379,13 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
     audioEngine.setMasterEQ('high', targetMasterEq.high);
     audioEngine.setPlaybackRate(targetPlaybackRate);
     audioEngine.setPitchShift(targetPitchShift);
+    audioEngine.updateMetronomeParams(song.bpm || 120, song.timeSignature || "4/4");
 
     set({ 
       currentSong: song, 
       currentTime: 0, 
       isPlaying: false, 
+      globalBpm: song.bpm || 120,
       playbackRate: targetPlaybackRate, 
       isLoadingSong: false, 
       pitchShift: targetPitchShift,
@@ -622,25 +633,29 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
     set({ metronomeEnabled: newState });
   },
 
-  updateBpm: (delta: number) => {
-    const { currentSong, setlist, globalBpm } = get();
+  setBpm: (targetBpm: number) => {
+    const newBpm = Math.max(30, Math.min(targetBpm, 300));
+    const { currentSong, setlist } = get();
     if (!currentSong) {
-      const newBpm = Math.max(30, Math.min(globalBpm + delta, 300));
       audioEngine.updateMetronomeParams(newBpm, "4/4");
       set({ globalBpm: newBpm });
       return;
     }
 
-    const newBpm = Math.max(30, Math.min(currentSong.bpm + delta, 300));
     const timeSig = currentSong.timeSignature || "4/4";
-    
     audioEngine.updateMetronomeParams(newBpm, timeSig);
-    
+
     const updatedSong = { ...currentSong, bpm: newBpm };
     const newSetlist = setlist.map(s => s.id === updatedSong.id ? updatedSong : s);
     storageEngine.saveSong(updatedSong, []);
-    
+
     set({ currentSong: updatedSong, setlist: newSetlist, globalBpm: newBpm });
+  },
+
+  updateBpm: (delta: number) => {
+    const { currentSong, globalBpm } = get();
+    const current = currentSong ? currentSong.bpm : globalBpm;
+    get().setBpm(current + delta);
   },
 
   tapTempo: () => {
@@ -662,23 +677,9 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
       const avgDiff = diffs.reduce((a, b) => a + b, 0) / diffs.length;
       
       let newBpm = Math.round(60000 / avgDiff);
-      // Clamp reasonable BPM
       newBpm = Math.max(30, Math.min(newBpm, 300));
       
-      const { currentSong, setlist } = get();
-      if (currentSong) {
-        const timeSig = currentSong.timeSignature || "4/4";
-        audioEngine.updateMetronomeParams(newBpm, timeSig);
-        
-        const updatedSong = { ...currentSong, bpm: newBpm };
-        const newSetlist = setlist.map(s => s.id === updatedSong.id ? updatedSong : s);
-        storageEngine.saveSong(updatedSong, []);
-        
-        set({ currentSong: updatedSong, setlist: newSetlist, globalBpm: newBpm });
-      } else {
-        audioEngine.updateMetronomeParams(newBpm, "4/4");
-        set({ globalBpm: newBpm });
-      }
+      get().setBpm(newBpm);
     }
     
     // Keep max 5 taps for moving average
@@ -688,22 +689,54 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
   },
 
   cycleTimeSignature: () => {
-    const { currentSong, setlist } = get();
+    const { currentSong } = get();
     if (!currentSong) return;
 
     // Common time signatures
-    const signatures = ["4/4", "3/4", "6/8", "2/4"];
+    const signatures = ["4/4", "3/4", "6/8", "2/4", "12/8", "5/4"];
     const currentIdx = signatures.indexOf(currentSong.timeSignature || "4/4");
     const nextIdx = (currentIdx + 1) % signatures.length;
     const nextSig = signatures[nextIdx];
 
+    get().setTimeSignature(nextSig);
+  },
+
+  setTimeSignature: async (nextSig: string) => {
+    const { currentSong, setlist } = get();
+    if (!currentSong) return;
+
     audioEngine.updateMetronomeParams(currentSong.bpm, nextSig);
+
+    const updatedStems = [...currentSong.stems];
+    const clickStemIndex = updatedStems.findIndex(
+      s => s.name.toLowerCase().includes('click') || s.name.toLowerCase().includes('tap') || s.id.toLowerCase().includes('click')
+    );
+
+    if (clickStemIndex !== -1 && currentSong.duration > 0) {
+      try {
+        const sampleRate = 44100;
+        const totalSamples = Math.floor(currentSong.duration * sampleRate);
+        const offsetSec = currentSong.firstBeatOffset || 0;
+        const pcm = generateClickPCM(totalSamples, currentSong.bpm || 120, offsetSec, nextSig, sampleRate);
+        const wav = createWavFileFromPCM(pcm.clickLeft, pcm.clickRight, 'click.wav', sampleRate);
+
+        updatedStems[clickStemIndex] = {
+          ...updatedStems[clickStemIndex],
+          file: wav.url,
+          originalFile: wav.file,
+        };
+
+        await audioEngine.loadStem(updatedStems[clickStemIndex].id, wav.file, true);
+      } catch (e) {
+        console.warn('Could not regenerate click stem buffer:', e);
+      }
+    }
     
-    const updatedSong = { ...currentSong, timeSignature: nextSig };
+    const updatedSong = { ...currentSong, timeSignature: nextSig, stems: updatedStems };
     const newSetlist = setlist.map(s => s.id === updatedSong.id ? updatedSong : s);
-    storageEngine.saveSong(updatedSong, []);
     
     set({ currentSong: updatedSong, setlist: newSetlist });
+    storageEngine.saveSong(updatedSong, []);
   },
 
   toggleLRSplit: () => {
@@ -782,6 +815,83 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
         masterVolume: 0.5,
         padVolume: 0.5
       });
+    }
+  },
+
+  addStemToCurrentSong: async (name: string, file: File, output: number = 3) => {
+    const { currentSong, setlist, isLRSplit } = get();
+    if (!currentSong) return;
+
+    const stemId = `${currentSong.id}-stem-${Date.now()}`;
+    const fileUrl = URL.createObjectURL(file);
+
+    const newStem: Stem = {
+      id: stemId,
+      name: name.trim() || file.name.replace(/\.[^/.]+$/, ""),
+      file: fileUrl,
+      originalFile: file,
+      output: output,
+      volume: 0.5,
+      isMuted: false,
+      isSoloed: false,
+      pan: isLRSplit ? (output === 1 ? -1 : output === 2 ? 1 : 0) : 0,
+      eq: { low: 0, mid: 0, high: 0 },
+      compressor: {
+        enabled: false,
+        threshold: -24,
+        ratio: 4,
+        attack: 0.003,
+        release: 0.25,
+        makeupGain: 0
+      }
+    };
+
+    // Load stem into Web Audio engine
+    await audioEngine.loadStem(stemId, file);
+    audioEngine.setStemVolume(stemId, 0.5);
+    audioEngine.setStemPan(stemId, newStem.pan);
+
+    const updatedStems = [...currentSong.stems, newStem];
+    const updatedSong = { ...currentSong, stems: updatedStems };
+    const updatedSetlist = setlist.map(s => s.id === updatedSong.id ? updatedSong : s);
+
+    // Save to persistent DB
+    try {
+      const buffer = await file.arrayBuffer();
+      await storageEngine.saveSong(updatedSong, [{ id: stemId, buffer }]);
+    } catch (err) {
+      console.error("Failed to save new stem to database:", err);
+    }
+
+    set({
+      currentSong: updatedSong,
+      setlist: updatedSetlist
+    });
+  },
+
+  removeStemFromCurrentSong: async (stemId: string) => {
+    const { currentSong, setlist } = get();
+    if (!currentSong) return;
+
+    // Remove from Web Audio Engine immediately
+    audioEngine.removeStem(stemId);
+
+    const updatedStems = currentSong.stems.filter(s => s.id !== stemId);
+    const updatedSong = { ...currentSong, stems: updatedStems };
+    const updatedSetlist = setlist.map(s => s.id === updatedSong.id ? updatedSong : s);
+
+    // Update state immediately
+    set({
+      currentSong: updatedSong,
+      setlist: updatedSetlist
+    });
+
+    // Delete from IndexedDB / Storage in background
+    try {
+      await storageEngine.deleteStem(stemId);
+      await storageEngine.saveSong(updatedSong, []);
+    } catch (e) {
+      console.error("Failed to save song after stem removal:", e);
     }
   },
   
@@ -879,6 +989,19 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
     }
   },
   toggleStageMode: () => set((state) => ({ isStageMode: !state.isStageMode })),
+  setThemeMode: (mode) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('app_theme_mode', mode);
+    }
+    set({ themeMode: mode });
+  },
+  toggleThemeMode: () => {
+    const nextMode = get().themeMode === 'high-contrast' ? 'default' : 'high-contrast';
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('app_theme_mode', nextMode);
+    }
+    set({ themeMode: nextMode });
+  },
   setShowSidebar: (show) => set({ isSidebarOpen: show }),
 
   setStemOutput: (stemId, output) => {
