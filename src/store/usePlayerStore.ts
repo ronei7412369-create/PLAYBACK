@@ -123,6 +123,9 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
   isPlaying: false,
   currentTime: 0,
   masterVolume: 0.5,
+  masterVolumeL: 0.5,
+  masterVolumeR: 0.5,
+  isMasterLinked: true,
   masterEq: { low: 0, mid: 0, high: 0 },
   isLooping: false,
   isInfiniteLoop: false,
@@ -565,17 +568,73 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
 
   setMasterVolume: (volume) => {
     audioEngine.setMasterVolume(volume);
+    audioEngine.setMasterVolumeL(volume);
+    audioEngine.setMasterVolumeR(volume);
     set((state) => {
-      if (!state.currentSong) return { masterVolume: volume };
-      const updatedSong = { ...state.currentSong, masterVolume: volume };
+      if (!state.currentSong) return { masterVolume: volume, masterVolumeL: volume, masterVolumeR: volume };
+      const updatedSong = { ...state.currentSong, masterVolume: volume, masterVolumeL: volume, masterVolumeR: volume };
       const updatedSetlist = state.setlist.map(s => s.id === updatedSong.id ? updatedSong : s);
       storageEngine.saveSong(updatedSong, []).catch(console.error);
       return {
         masterVolume: volume,
+        masterVolumeL: volume,
+        masterVolumeR: volume,
         currentSong: updatedSong,
         setlist: updatedSetlist
       };
     });
+  },
+
+  setMasterVolumeL: (volume) => {
+    audioEngine.setMasterVolumeL(volume);
+    const { isMasterLinked, masterVolumeR } = get();
+    let nextR = masterVolumeR;
+    if (isMasterLinked) {
+      nextR = volume;
+      audioEngine.setMasterVolumeR(volume);
+    }
+    const avg = (volume + nextR) / 2;
+    set((state) => {
+      if (!state.currentSong) return { masterVolumeL: volume, masterVolumeR: nextR, masterVolume: avg };
+      const updatedSong = { ...state.currentSong, masterVolumeL: volume, masterVolumeR: nextR, masterVolume: avg };
+      const updatedSetlist = state.setlist.map(s => s.id === updatedSong.id ? updatedSong : s);
+      storageEngine.saveSong(updatedSong, []).catch(console.error);
+      return {
+        masterVolumeL: volume,
+        masterVolumeR: nextR,
+        masterVolume: avg,
+        currentSong: updatedSong,
+        setlist: updatedSetlist
+      };
+    });
+  },
+
+  setMasterVolumeR: (volume) => {
+    audioEngine.setMasterVolumeR(volume);
+    const { isMasterLinked, masterVolumeL } = get();
+    let nextL = masterVolumeL;
+    if (isMasterLinked) {
+      nextL = volume;
+      audioEngine.setMasterVolumeL(volume);
+    }
+    const avg = (nextL + volume) / 2;
+    set((state) => {
+      if (!state.currentSong) return { masterVolumeL: nextL, masterVolumeR: volume, masterVolume: avg };
+      const updatedSong = { ...state.currentSong, masterVolumeL: nextL, masterVolumeR: volume, masterVolume: avg };
+      const updatedSetlist = state.setlist.map(s => s.id === updatedSong.id ? updatedSong : s);
+      storageEngine.saveSong(updatedSong, []).catch(console.error);
+      return {
+        masterVolumeL: nextL,
+        masterVolumeR: volume,
+        masterVolume: avg,
+        currentSong: updatedSong,
+        setlist: updatedSetlist
+      };
+    });
+  },
+
+  toggleMasterLink: () => {
+    set((state) => ({ isMasterLinked: !state.isMasterLinked }));
   },
 
   setMasterEQ: (band, value) => {
@@ -873,26 +932,28 @@ export const usePlayerStore = create<PlayerState & { hasAccess: boolean }>((set,
     const { currentSong, setlist } = get();
     if (!currentSong) return;
 
-    // Remove from Web Audio Engine immediately
+    // 1. Stop and remove from Web Audio Engine immediately
     audioEngine.removeStem(stemId);
 
     const updatedStems = currentSong.stems.filter(s => s.id !== stemId);
     const updatedSong = { ...currentSong, stems: updatedStems };
     const updatedSetlist = setlist.map(s => s.id === updatedSong.id ? updatedSong : s);
 
-    // Update state immediately
+    // 2. Update Zustand state immediately so UI re-renders without track instantly
     set({
       currentSong: updatedSong,
       setlist: updatedSetlist
     });
 
-    // Delete from IndexedDB / Storage in background
-    try {
-      await storageEngine.deleteStem(stemId);
-      await storageEngine.saveSong(updatedSong, []);
-    } catch (e) {
-      console.error("Failed to save song after stem removal:", e);
-    }
+    // 3. Perform IndexedDB and storage deletion asynchronously in background
+    (async () => {
+      try {
+        await storageEngine.deleteStem(stemId);
+        await storageEngine.saveSong(updatedSong, []);
+      } catch (e) {
+        console.error("Failed to persist stem deletion:", e);
+      }
+    })();
   },
   
   toggleStemMute: (stemId) => {

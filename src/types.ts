@@ -48,6 +48,8 @@ export interface Song {
   waveformPeaks?: number[]; // Extracted audio data
   lyrics?: string; // Teleprompter lyrics
   masterVolume?: number;
+  masterVolumeL?: number;
+  masterVolumeR?: number;
   masterEq?: { low: number; mid: number; high: number };
   playbackRate?: number;
   pitchShift?: number;
@@ -73,6 +75,9 @@ export interface PlayerState {
   isPlaying: boolean;
   currentTime: number;
   masterVolume: number;
+  masterVolumeL: number;
+  masterVolumeR: number;
+  isMasterLinked: boolean;
   masterEq: { low: number; mid: number; high: number };
   isLooping: boolean;
   isInfiniteLoop: boolean;
@@ -134,6 +139,9 @@ export interface PlayerState {
   stop: () => void;
   seek: (time: number) => void;
   setMasterVolume: (volume: number) => void;
+  setMasterVolumeL: (volume: number) => void;
+  setMasterVolumeR: (volume: number) => void;
+  toggleMasterLink: () => void;
   setMasterEQ: (band: 'low' | 'mid' | 'high', value: number) => void;
   setPlaybackRate: (rate: number) => void;
   setPitchShift: (semitones: number) => void;

@@ -4,6 +4,12 @@ import * as Tone from 'tone';
 export class AudioEngine {
   private context: AudioContext;
   public masterGain: GainNode;
+  public masterGainL: GainNode;
+  public masterGainR: GainNode;
+  private masterSplitter: ChannelSplitterNode;
+  private masterMerger: ChannelMergerNode;
+  public masterLAnalyser: AnalyserNode;
+  public masterRAnalyser: AnalyserNode;
   public masterEqLow: BiquadFilterNode;
   public masterEqMid: BiquadFilterNode;
   public masterEqHigh: BiquadFilterNode;
@@ -76,12 +82,35 @@ export class AudioEngine {
     this.masterEqHigh.type = 'highshelf';
     this.masterEqHigh.frequency.value = 3200;
     
-    // Connect Master -> EQ -> PitchShift -> Destination
+    // Master L/R channel setup
+    this.masterSplitter = this.context.createChannelSplitter(2);
+    this.masterGainL = this.context.createGain();
+    this.masterGainR = this.context.createGain();
+    this.masterLAnalyser = this.context.createAnalyser();
+    this.masterRAnalyser = this.context.createAnalyser();
+    this.masterLAnalyser.fftSize = 64;
+    this.masterRAnalyser.fftSize = 64;
+    this.masterMerger = this.context.createChannelMerger(2);
+
+    // Connect Master -> EQ -> PitchShift -> Splitter
     this.masterGain.connect(this.masterEqLow);
     this.masterEqLow.connect(this.masterEqMid);
     this.masterEqMid.connect(this.masterEqHigh);
     Tone.connect(this.masterEqHigh, this.pitchShift);
-    Tone.connect(this.pitchShift, this.context.destination);
+    Tone.connect(this.pitchShift, this.masterSplitter);
+
+    // Left channel (0)
+    this.masterSplitter.connect(this.masterGainL, 0);
+    this.masterGainL.connect(this.masterLAnalyser);
+    this.masterGainL.connect(this.masterMerger, 0, 0);
+
+    // Right channel (1)
+    this.masterSplitter.connect(this.masterGainR, 1);
+    this.masterGainR.connect(this.masterRAnalyser);
+    this.masterGainR.connect(this.masterMerger, 0, 1);
+
+    // Output to speakers/headphones
+    this.masterMerger.connect(this.context.destination);
 
     this.clickGain = this.context.createGain();
     this.clickGain.gain.value = 0.8;
@@ -517,6 +546,40 @@ export class AudioEngine {
 
   public setMasterVolume(volume: number) {
     this.masterGain.gain.setTargetAtTime(Math.max(0.001, volume), this.context.currentTime, 0.05);
+  }
+
+  public setMasterVolumeL(volume: number) {
+    if (this.masterGainL) {
+      this.masterGainL.gain.setTargetAtTime(Math.max(0, volume), this.context.currentTime, 0.05);
+    }
+  }
+
+  public setMasterVolumeR(volume: number) {
+    if (this.masterGainR) {
+      this.masterGainR.gain.setTargetAtTime(Math.max(0, volume), this.context.currentTime, 0.05);
+    }
+  }
+
+  public getMasterLevelL(): number {
+    if (!this.masterLAnalyser) return 0;
+    const dataArray = new Uint8Array(this.masterLAnalyser.frequencyBinCount);
+    this.masterLAnalyser.getByteFrequencyData(dataArray);
+    let max = 0;
+    for (let i = 0; i < dataArray.length; i++) {
+      if (dataArray[i] > max) max = dataArray[i];
+    }
+    return max / 255;
+  }
+
+  public getMasterLevelR(): number {
+    if (!this.masterRAnalyser) return 0;
+    const dataArray = new Uint8Array(this.masterRAnalyser.frequencyBinCount);
+    this.masterRAnalyser.getByteFrequencyData(dataArray);
+    let max = 0;
+    for (let i = 0; i < dataArray.length; i++) {
+      if (dataArray[i] > max) max = dataArray[i];
+    }
+    return max / 255;
   }
 
   public setMasterEQ(band: 'low' | 'mid' | 'high', value: number) {

@@ -4,7 +4,7 @@ import { usePlayerStore } from '../store/usePlayerStore';
 import { Stem } from '../types';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
-import { Settings, X, Volume2, VolumeX, Headphones, SlidersHorizontal, Activity, Clock, Plus, Upload, Trash2, Check } from 'lucide-react';
+import { Settings, X, Volume2, VolumeX, Headphones, SlidersHorizontal, Activity, Clock, Plus, Upload, Trash2, Check, Link2, Link2Off, RotateCcw } from 'lucide-react';
 import { audioEngine } from '../services/audioEngine';
 import { handleMidiRightClick } from '../store/useMidiStore';
 
@@ -276,6 +276,219 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({ stem, index, onOpenDetails,
             </button>
          </div>
       </div>
+    </motion.div>
+  );
+};
+
+// MasterChannelStrip Component with separated L/R volume
+const MasterChannelStrip: React.FC = () => {
+  const { 
+    masterVolumeL, 
+    masterVolumeR, 
+    setMasterVolumeL, 
+    setMasterVolumeR, 
+    isMasterLinked, 
+    toggleMasterLink,
+    resetAllVolumesToZeroDb, 
+    isPlaying, 
+    themeMode 
+  } = usePlayerStore();
+
+  const meterLRef = useRef<HTMLDivElement>(null);
+  const meterRRef = useRef<HTMLDivElement>(null);
+  const animFrameRef = useRef<number | null>(null);
+  const isHighContrast = themeMode === 'high-contrast';
+
+  useEffect(() => {
+    const updateMeters = () => {
+      if (isPlaying) {
+        const lvlL = audioEngine.getMasterLevelL();
+        const lvlR = audioEngine.getMasterLevelR();
+        if (meterLRef.current) {
+          meterLRef.current.style.height = `${Math.min(100, Math.max(0, lvlL * 100))}%`;
+        }
+        if (meterRRef.current) {
+          meterRRef.current.style.height = `${Math.min(100, Math.max(0, lvlR * 100))}%`;
+        }
+      } else {
+        if (meterLRef.current) meterLRef.current.style.height = '0%';
+        if (meterRRef.current) meterRRef.current.style.height = '0%';
+      }
+      animFrameRef.current = requestAnimationFrame(updateMeters);
+    };
+
+    updateMeters();
+    return () => {
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    };
+  }, [isPlaying]);
+
+  const getDbLabel = (vol: number) => {
+    if (vol <= 0.001) return '-∞';
+    const dbVal = 20 * Math.log10(vol);
+    return dbVal >= 0 ? `+${dbVal.toFixed(1)}` : `${dbVal.toFixed(1)}`;
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className={cn(
+        "flex flex-col items-center shrink-0 h-full w-32 sm:w-36 md:w-40 py-2.5 px-2 sticky left-0 z-30 transition-all border-r shadow-[8px_0_30px_rgba(0,0,0,0.85)] backdrop-blur-xl",
+        isHighContrast
+          ? "bg-[#09090e] border-r-2 border-white/40"
+          : "bg-gradient-to-b from-red-950/40 via-black/90 to-black border-red-500/30"
+      )}
+    >
+      {/* Header Badge */}
+      <div className="flex flex-col items-center w-full mb-2 gap-1">
+        <div className="flex items-center gap-1 bg-red-500/20 border border-red-500/40 px-2 py-0.5 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.2)]">
+          <Volume2 size={10} className="text-red-400 animate-pulse" />
+          <span className="text-[9px] md:text-[10px] font-black tracking-wider uppercase text-red-400">
+            VOLUME MASTER
+          </span>
+        </div>
+
+        {/* Stereo L/R Badge & Link Toggle */}
+        <div className="flex items-center justify-between w-full px-1 pt-0.5">
+          <span className="text-[8px] md:text-[9px] font-extrabold text-white/50 tracking-widest uppercase">
+            STEREO
+          </span>
+          <button
+            type="button"
+            onClick={toggleMasterLink}
+            title={isMasterLinked ? "Desvincular L e R (ajuste separado)" : "Vincular L e R (ajuste conjunto)"}
+            className={cn(
+              "flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8px] font-bold transition-all border cursor-pointer",
+              isMasterLinked
+                ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40 shadow-[0_0_8px_rgba(6,182,212,0.3)]"
+                : "bg-white/5 text-white/40 border-white/10 hover:text-white"
+            )}
+          >
+            {isMasterLinked ? <Link2 size={10} /> : <Link2Off size={10} />}
+            <span>{isMasterLinked ? "LINK" : "SPLIT"}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Dual Faders Container (L and R) */}
+      <div className="flex-1 w-full relative flex items-center justify-around py-1 bg-black/50 rounded-xl border border-white/5 px-1 overflow-hidden">
+        {/* Left Fader Column */}
+        <div className="flex-1 h-full flex flex-col items-center relative group/faderL">
+          {/* Channel Label */}
+          <span className="text-[9px] font-black text-cyan-400 mb-1 tracking-wider uppercase">L</span>
+
+          {/* VU Meter + Track */}
+          <div className="flex-1 relative w-full flex justify-center items-center">
+            {/* VU Meter Background */}
+            <div className="absolute left-1 sm:left-1.5 top-0 bottom-0 w-1 sm:w-1.5 rounded-full bg-black/80 overflow-hidden border border-white/10">
+              <div
+                ref={meterLRef}
+                className="w-full absolute bottom-0 left-0 transition-[height] duration-75 rounded-b-full bg-gradient-to-t from-emerald-500 via-amber-400 to-red-500"
+                style={{ height: '0%' }}
+              />
+            </div>
+
+            {/* Fader Track Line */}
+            <div className="absolute top-0 bottom-0 w-1 rounded-full bg-white/10" />
+
+            {/* Tick Marks for 0dB */}
+            <div className="absolute top-[50%] left-0 right-0 flex items-center justify-center pointer-events-none">
+              <div className="w-full border-t border-dashed border-emerald-400/40" />
+            </div>
+
+            {/* Range Input for L */}
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={masterVolumeL}
+              onChange={(e) => setMasterVolumeL(parseFloat(e.target.value))}
+              onContextMenu={(e) => handleMidiRightClick(e, 'master_vol_l', 'Volume Master Left', 'Master L')}
+              className="absolute top-0 bottom-0 left-0 w-full opacity-0 cursor-pointer z-20 [writing-mode:bt-lr] [appearance:slider-vertical]"
+            />
+
+            {/* Custom Fader Thumb L */}
+            <div
+              className="absolute w-5 sm:w-6.5 md:w-7 h-5 sm:h-6.5 md:h-7 rounded-lg bg-gradient-to-br from-[#20202d] to-[#0d0d12] border border-cyan-400/70 shadow-[0_0_12px_rgba(6,182,212,0.4)] z-10 pointer-events-none flex flex-col items-center justify-center gap-0.5"
+              style={{ bottom: `${masterVolumeL * 100}%`, transform: 'translateY(50%)' }}
+            >
+              <div className="w-3.5 h-[2px] bg-cyan-400 rounded-full" />
+            </div>
+          </div>
+
+          {/* Value Readout */}
+          <span className="text-[8px] sm:text-[8.5px] font-mono font-extrabold text-cyan-300/90 mt-1">
+            {getDbLabel(masterVolumeL)}dB
+          </span>
+        </div>
+
+        {/* Divider */}
+        <div className="w-[1px] h-[85%] bg-white/10 mx-0.5" />
+
+        {/* Right Fader Column */}
+        <div className="flex-1 h-full flex flex-col items-center relative group/faderR">
+          {/* Channel Label */}
+          <span className="text-[9px] font-black text-red-400 mb-1 tracking-wider uppercase">R</span>
+
+          {/* VU Meter + Track */}
+          <div className="flex-1 relative w-full flex justify-center items-center">
+            {/* VU Meter Background */}
+            <div className="absolute left-1 sm:left-1.5 top-0 bottom-0 w-1 sm:w-1.5 rounded-full bg-black/80 overflow-hidden border border-white/10">
+              <div
+                ref={meterRRef}
+                className="w-full absolute bottom-0 left-0 transition-[height] duration-75 rounded-b-full bg-gradient-to-t from-emerald-500 via-amber-400 to-red-500"
+                style={{ height: '0%' }}
+              />
+            </div>
+
+            {/* Fader Track Line */}
+            <div className="absolute top-0 bottom-0 w-1 rounded-full bg-white/10" />
+
+            {/* Tick Marks for 0dB */}
+            <div className="absolute top-[50%] left-0 right-0 flex items-center justify-center pointer-events-none">
+              <div className="w-full border-t border-dashed border-emerald-400/40" />
+            </div>
+
+            {/* Range Input for R */}
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={masterVolumeR}
+              onChange={(e) => setMasterVolumeR(parseFloat(e.target.value))}
+              onContextMenu={(e) => handleMidiRightClick(e, 'master_vol_r', 'Volume Master Right', 'Master R')}
+              className="absolute top-0 bottom-0 left-0 w-full opacity-0 cursor-pointer z-20 [writing-mode:bt-lr] [appearance:slider-vertical]"
+            />
+
+            {/* Custom Fader Thumb R */}
+            <div
+              className="absolute w-5 sm:w-6.5 md:w-7 h-5 sm:h-6.5 md:h-7 rounded-lg bg-gradient-to-br from-[#20202d] to-[#0d0d12] border border-red-400/70 shadow-[0_0_12px_rgba(239,68,68,0.4)] z-10 pointer-events-none flex flex-col items-center justify-center gap-0.5"
+              style={{ bottom: `${masterVolumeR * 100}%`, transform: 'translateY(50%)' }}
+            >
+              <div className="w-3.5 h-[2px] bg-red-400 rounded-full" />
+            </div>
+          </div>
+
+          {/* Value Readout */}
+          <span className="text-[8px] sm:text-[8.5px] font-mono font-extrabold text-red-300/90 mt-1">
+            {getDbLabel(masterVolumeR)}dB
+          </span>
+        </div>
+      </div>
+
+      {/* Quick Reset 0dB Action Button */}
+      <button
+        type="button"
+        onClick={resetAllVolumesToZeroDb}
+        title="Resetar Master e todas as tracks para 0dB (nominal)"
+        className="mt-2 w-full py-1 px-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 hover:text-emerald-300 text-[8px] font-extrabold uppercase tracking-wider transition-all flex items-center justify-center gap-1 shadow-sm cursor-pointer shrink-0"
+      >
+        <RotateCcw size={10} />
+        <span>RESET 0dB</span>
+      </button>
     </motion.div>
   );
 };
@@ -1466,6 +1679,9 @@ export const Mixer: React.FC = () => {
         }} 
       />
       
+      {/* Master Channel Strip (L / R) - Fixed at the very start of tracks */}
+      <MasterChannelStrip />
+
       {currentSong.stems.map((stem, index) => (
         <ChannelStrip 
           key={stem.id} 
@@ -1491,25 +1707,6 @@ export const Mixer: React.FC = () => {
          <span className={cn(
             "text-[9px] md:text-[10px] font-black mt-2.5 uppercase tracking-wider leading-tight text-cyan-300"
          )}>Adicionar<br/>Track</span>
-      </div>
-
-      {/* Botão de reset rápido para 0dB */}
-      <div className={cn(
-         "flex flex-col items-center justify-center w-16 sm:w-20 md:w-24 shrink-0 h-full p-3 text-center transition-all",
-         isHighContrast ? "border-l-2 border-white/20 bg-[#08080c] hover:bg-[#101018]" : "border-l border-white/5 bg-white/[0.01] hover:bg-white/[0.03]"
-      )}>
-         <span className="text-[8px] md:text-[9.5px] font-black uppercase tracking-widest text-[#2ECC71] drop-shadow-[0_0_4px_rgba(46,204,113,0.3)] mb-3">0dB nominal</span>
-         <button
-           onClick={resetAllVolumesToZeroDb}
-           title="Colocar todos os volumes em 0dB"
-           className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-[#2ECC71]/10 border border-[#2ECC71]/30 hover:bg-[#2ECC71] hover:text-black hover:shadow-[0_0_15px_#2ECC71] text-[#2ECC71] transition-all flex items-center justify-center group"
-         >
-           <Activity size={18} className="group-hover:scale-110 transition-transform animate-pulse" />
-         </button>
-         <span className={cn(
-            "text-[8px] md:text-[9.5px] font-bold mt-3 uppercase leading-tight",
-            isHighContrast ? "text-white/80" : "text-white/40"
-         )}>Resetar<br/>Volumes</span>
       </div>
 
       <div className="min-w-[40px]" />

@@ -381,14 +381,25 @@ export class StorageEngine {
   }
 
   async deleteStem(stemId: string): Promise<void> {
-    if (!this.db) await this.init();
-    
-    await new Promise<void>((resolve, reject) => {
-      const transaction = this.db!.transaction(['stems'], 'readwrite');
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = (err) => reject(err);
-      transaction.objectStore('stems').delete(stemId);
-    });
+    try {
+      if (!this.db) await this.init();
+      if (this.db) {
+        await new Promise<void>((resolve) => {
+          const timeout = setTimeout(() => resolve(), 1000);
+          try {
+            const transaction = this.db!.transaction(['stems'], 'readwrite');
+            transaction.oncomplete = () => { clearTimeout(timeout); resolve(); };
+            transaction.onerror = () => { clearTimeout(timeout); resolve(); };
+            transaction.objectStore('stems').delete(stemId);
+          } catch (e) {
+            clearTimeout(timeout);
+            resolve();
+          }
+        });
+      }
+    } catch (e) {
+      console.warn("IndexedDB deleteStem warning:", e);
+    }
 
     if (auth.currentUser) {
       const fileRef = ref(storage, `users/${auth.currentUser.uid}/stems/${stemId}`);
